@@ -1,12 +1,11 @@
-"""Run this file to open the webcam and visualize detected ArUco tags.
-
-Press 'q' to quit.
+"""
+Script to open the webcam and visualize detected ArUco tags.
 """
 
 import cv2
 
 from robot_commander.camera.camera import Camera
-from robot_commander.camera.tag_detector import TagDetector
+from robot_commander.camera.tag_detector import TagDetector, draw_tags
 
 
 def main():
@@ -21,7 +20,7 @@ def main():
                 break
 
             tags = detector.detect(frame)
-            annotated = detector.draw(frame, tags)
+            annotated = draw_tags(frame, tags)
 
             for tag in tags:
                 print(f"  Tag ID={tag.tag_id}  center={tag.center[0]:.1f}, {tag.center[1]:.1f}")

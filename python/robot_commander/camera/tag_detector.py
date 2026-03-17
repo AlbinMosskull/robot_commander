@@ -3,22 +3,24 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+DEFAULT_ARUCO_DICT = cv2.aruco.DICT_4X4_50
 
 @dataclass
 class DetectedTag:
     tag_id: int
-    corners: np.ndarray  # shape (4, 2), pixel coordinates of the four corners
+    corners: np.ndarray  # shape (4, 2): [top-left, top-right, bottom-right, bottom-left]
     center: tuple[float, float]
 
 
 class TagDetector:
-    """Detects ArUco tags in frames.
+    """
+    Detects ArUco tags in frames.
 
     Args:
         dictionary: ArUco dictionary ID.
     """
 
-    def __init__(self, dictionary: int = cv2.aruco.DICT_4X4_50):
+    def __init__(self, dictionary: int = DEFAULT_ARUCO_DICT):
         aruco_dict = cv2.aruco.getPredefinedDictionary(dictionary)
         params = cv2.aruco.DetectorParameters()
         self._detector = cv2.aruco.ArucoDetector(aruco_dict, params)
@@ -35,13 +37,14 @@ class TagDetector:
             results.append(DetectedTag(tag_id=int(tag_id), corners=pts, center=center))
         return results
 
-    def draw(self, frame: cv2.typing.MatLike, tags: list[DetectedTag]) -> cv2.typing.MatLike:
-        out = frame.copy()
-        for tag in tags:
-            pts = tag.corners.astype(int)
-            cv2.polylines(out, [pts.reshape((-1, 1, 2))], isClosed=True, color=(0, 255, 0), thickness=2)
-            cx, cy = int(tag.center[0]), int(tag.center[1])
-            cv2.circle(out, (cx, cy), 4, (0, 0, 255), -1)
-            cv2.putText(out, f"ID {tag.tag_id}", (cx + 8, cy - 8),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        return out
+
+def draw_tags(frame: cv2.typing.MatLike, tags: list[DetectedTag]) -> cv2.typing.MatLike:
+    out = frame.copy()
+    for tag in tags:
+        pts = tag.corners.astype(int)
+        cv2.polylines(out, [pts.reshape((-1, 1, 2))], isClosed=True, color=(0, 255, 0), thickness=2)
+        cx, cy = int(tag.center[0]), int(tag.center[1])
+        cv2.circle(out, (cx, cy), 4, (0, 0, 255), -1)
+        cv2.putText(out, f"ID {tag.tag_id}", (cx + 8, cy - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    return out
