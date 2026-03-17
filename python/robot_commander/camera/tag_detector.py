@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-DEFAULT_ARUCO_DICT = cv2.aruco.DICT_4X4_50
+DEFAULT_ARUCO_DICT = cv2.aruco.DICT_APRILTAG_36h11
 
 @dataclass
 class DetectedTag:
