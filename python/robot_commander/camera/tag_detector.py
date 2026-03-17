@@ -26,7 +26,7 @@ class TagDetector:
         self._detector = cv2.aruco.ArucoDetector(aruco_dict, params)
 
     def detect(self, frame: cv2.typing.MatLike) -> list[DetectedTag]:
-        corners, ids, _ = self._detector.detectMarkers(frame)
+        corners, ids, _ = self._detector.detectMarkers(frame)  # pylint: disable=unpacking-non-sequence
         if ids is None:
             return []
 

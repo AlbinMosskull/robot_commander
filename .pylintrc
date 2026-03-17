@@ -1,5 +1,9 @@
+[MASTER]
+generated-members=cv2.*
+
 [MESSAGES CONTROL]
 disable=
-    missing-module-docstring
-    missing-class-docstring
-    missing-function-docstring
+    missing-module-docstring,
+    missing-class-docstring,
+    missing-function-docstring,
+    too-few-public-methods
