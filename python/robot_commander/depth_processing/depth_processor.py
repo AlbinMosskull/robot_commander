@@ -4,6 +4,7 @@ Depth estimation using Depth Anything V2.
 
 import cv2
 import numpy as np
+import torch
 from PIL import Image
 from transformers import pipeline
 
@@ -17,7 +18,8 @@ class DepthProcessor:
     """
 
     def __init__(self, model: str = "depth-anything/Depth-Anything-V2-Small-hf"):
-        self._pipe = pipeline(task="depth-estimation", model=model)
+        device = 0 if torch.cuda.is_available() else -1
+        self._pipe = pipeline(task="depth-estimation", model=model, device=device)
 
     def process(self, frame: np.ndarray) -> np.ndarray:
         """
