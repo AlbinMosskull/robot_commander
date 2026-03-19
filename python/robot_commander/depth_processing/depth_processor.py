@@ -14,7 +14,7 @@ class DepthProcessor:
     Runs Depth Anything V2 on camera frames to produce depth maps.
 
     Args:
-        model: HuggingFace model ID. Defaults to the small V2 model for speed.
+        model: HuggingFace model ID.
     """
 
     def __init__(self, model: str = "depth-anything/Depth-Anything-V2-Small-hf"):

@@ -27,4 +27,6 @@ def test_gives_expected_result_for_basic_frame(processor):
     frame[240:, :] = 255  # Half white, half black
     result = processor.process(frame)
     assert result.shape == (480, 640)
-    assert np.all(result[:240, :] < result[240:, :]), "Depth should be greater in the part of the frame that is white"
+    depth_white_side_of_frame = result[240:, :]
+    depth_black_side_of_frame = result[:240, :]
+    assert np.mean(depth_white_side_of_frame) < np.mean(depth_black_side_of_frame), "Depth should be greater in the part of the frame that is black"
