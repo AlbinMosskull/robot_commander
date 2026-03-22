@@ -68,50 +68,31 @@ impl MinHeap {
         let mut current_index = 0;
         loop {
             let current_element = self.heap[current_index];
-
             let left_child = current_index * 2 + 1;
             let right_child = current_index * 2 + 2;
 
-            // Find smallest child
-
+            // No children exist, return early
             if left_child >= full_length {
                 return;
             } 
-            let left_child_element = self.heap[left_child];
-            if left_child_element < current_element {
-                if right_child >= full_length {
-                    self.heap.swap(current_index, left_child);
-                    return;
-                } else {
-                    let right_child_element = self.heap[right_child];
 
-                    if right_child_element < left_child_element {
-                        self.heap.swap(current_index, right_child);
-                        current_index = right_child;
-                    } else {
-                        self.heap.swap(current_index, left_child);
-                        current_index = left_child;
-                    }
-                    continue;
-                }
-
-            }
-
+            let mut min_child_index: usize;
             if right_child >= full_length {
-                return;
+                min_child_index = left_child;
+            } else {
+                let is_left_child_smaller = self.heap[left_child] < self.heap[right_child];
+                min_child_index = if is_left_child_smaller {left_child} else {right_child}
             }
-            let right_child_element = self.heap[right_child];
-            if right_child_element < current_element {
-                self.heap.swap(current_index, right_child);
-                current_index = right_child;
+
+            if current_element > self.heap[min_child_index] {
+                self.heap.swap(current_index, min_child_index);
+                current_index = min_child_index;
                 continue;
             }
-            
-            // If left child and right child are bigger or equal to current_element (the parent)
-            // we are done.
+
+            // Parent is bigger than children -> we are done
             break;
         }
-
     }
 }
 
@@ -123,7 +104,10 @@ mod tests {
 
     #[test]
     fn basic_test() {
-        let mut min_heap = MinHeap{heap: vec![1; 3]};
+        let mut min_heap = MinHeap::new();
+        min_heap.insert(1);
+        min_heap.insert(1);
+        min_heap.insert(1);
         min_heap.insert(2);
         min_heap.insert(3);
         assert_eq!(min_heap.extract_min().expect("Should have a value"), 1);
@@ -180,5 +164,4 @@ mod tests {
         assert_eq!(min_heap.extract_min().expect("Should have a value"), 1);
 
     }
-    
 }
