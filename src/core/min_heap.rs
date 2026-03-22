@@ -4,6 +4,12 @@ pub struct MinHeap {
 }
 
 impl MinHeap {
+    pub fn new() -> Self {
+        MinHeap {
+            heap: Vec::new()
+        }
+    }
+
     pub fn extract_min(&mut self) -> Option<i32> {
         if self.len() <= 0 {
             return None;
@@ -34,11 +40,11 @@ impl MinHeap {
         let mut current_index = self.len() - 1;
 
         while current_index != 0 {
-            let parent: usize = current_index - 1 / 2;
+            let parent: usize = (current_index - 1) / 2;
             let current_element = self.heap[current_index];
             let parent_element = self.heap[parent];
 
-            if parent_element < current_element {
+            if parent_element > current_element {
                 self.swap_values(current_index, parent);
                 current_index = parent;
                 continue;
@@ -73,7 +79,6 @@ impl MinHeap {
             if left_child_element < current_element {
                 if right_child >= full_length {
                     self.swap_values(current_index, left_child);
-                    current_index = left_child;
                     return;
                 } else {
                     let right_child_element = self.heap[right_child];
@@ -85,10 +90,7 @@ impl MinHeap {
                         self.swap_values(current_index, left_child);
                         current_index = left_child;
                     }
-
                     continue;
-
-
                 }
 
             }
@@ -134,6 +136,26 @@ mod tests {
         assert_eq!(min_heap.extract_min().expect("Should have a value"), 2);
         assert_eq!(min_heap.len(), 1);
         assert_eq!(min_heap.extract_min().expect("Should have a value"), 3);
+    }
+
+    #[test]
+    fn min_basic_test_2() {
+        let mut min_heap = MinHeap::new();
+        min_heap.insert(4);
+        min_heap.simple_print();
+        min_heap.insert(5);
+        min_heap.simple_print();
+        min_heap.insert(1);
+        min_heap.simple_print();
+        min_heap.insert(3);
+        min_heap.simple_print();
+        min_heap.insert(2);
+        min_heap.simple_print();
+        assert_eq!(min_heap.extract_min().expect("Should have a value"), 1);
+        assert_eq!(min_heap.extract_min().expect("Should have a value"), 2);
+        assert_eq!(min_heap.extract_min().expect("Should have a value"), 3);
+        assert_eq!(min_heap.extract_min().expect("Should have a value"), 4);
+        assert_eq!(min_heap.extract_min().expect("Should have a value"), 5);
     }
 
 }
