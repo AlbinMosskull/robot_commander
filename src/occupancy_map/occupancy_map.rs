@@ -8,6 +8,9 @@ impl OccupancyMap {
             is_occupied: vec![vec![false; num_cols]; num_rows]
         }
     }
+    pub fn is_position_occupied(&self, x: usize, y: usize) -> bool {
+        self.is_occupied[y][x]
+    }
 }
 
 #[cfg(test)]
