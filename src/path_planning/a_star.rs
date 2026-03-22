@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::cmp::Ordering;
 
 use crate::occupancy_map::occupancy_map::OccupancyMap;
@@ -6,10 +7,18 @@ use crate::core::min_heap::MinHeap;
 
 
 // TODO move to a common data types folder.
-#[derive(Copy, Clone)] 
+#[derive(Copy, Clone, Hash)] 
 pub struct Position {
     x: usize,
     y: usize,
+}
+
+impl Eq for Position {}
+
+impl PartialEq for Position {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y
+    }
 }
 
 #[derive(Copy, Clone)] 
@@ -31,9 +40,9 @@ impl Ord for PositionWithCost {
         if diff < 0.0 {
             return Ordering::Less;
         } else if diff > 0.0 {
-            return Ordering::Greater
+            return Ordering::Greater;
         } else {
-            return Ordering::Equal
+            return Ordering::Equal;
         }
     }
 }
@@ -53,17 +62,62 @@ impl PartialEq for PositionWithCost {
     }
 }
 
+fn reconstruct_path(came_from: &HashMap<Position, Position>, final_position: Position) -> Vec<Position> {
+    let full_path: Vec<Position> = Vec::new();
 
-pub fn plan_path(occ_map: OccupancyMap, start: Position, goal: Position) -> Vec<Position> {
-    let mut came_from: HashMap<Position, Position> = HashMap::new();
-    let mut open_set: MinHeap<PositionWithCost> = MinHeap::new();
-    
-    
-    Vec::new()
+    let mut current_position = final_position;
+    // loop {
+    //     match came_from[current_position]
+
+
+    // }
+    full_path
 }
 
-fn heuristic_cost_to_go(current: Position, goal: Position) -> usize {
-    (goal.x - current.x)^2 + (goal.y - current.y)^2
+fn get_neighbors(occ_map: &OccupancyMap, position: Position) -> Vec<PositionWithCost> {
+    let neighbors: Vec<PositionWithCost> = Vec::new();
+    neighbors
+}
+
+
+pub fn plan_path(occ_map: OccupancyMap, start: Position, goal: Position) -> Vec<Position> {
+    let mut closed: HashSet<Position> = HashSet::new();
+    let mut came_from: HashMap<Position, Position> = HashMap::new();
+    let mut open_set: MinHeap<PositionWithCost> = MinHeap::new();
+
+    let costed_start = PositionWithCost {
+        position: start,
+        from_start_cost: 0.0,
+        heuristic_cost_to_go: heuristic_cost_to_go(start, goal),
+    };
+    open_set.insert(costed_start);
+    
+    while open_set.len() != 0 {
+        let current = open_set.extract_min().expect("While loop checks for empty");
+
+        if current.position == goal {
+            return reconstruct_path(&came_from, current.position);
+        }
+
+        let mut neighbors = get_neighbors(&occ_map, current.position);
+        for mut neighbor in neighbors {
+            let tenative_cost = current.from_start_cost + 1.0;  // 1 being cost per edge
+            if tenative_cost < neighbor.from_start_cost {
+                // came_from[&neighbor.position] = current.position;
+                if let Some(val) = came_from.get_mut(&neighbor.position) { *val = current.position; }; // No clue what is happening here
+                neighbor.from_start_cost = tenative_cost;
+                // if neighbor ! in open_set {  // TODO need to support this
+                //     open_set.insert(neighbor);
+                // }
+            }
+        }
+    }
+
+    Vec::new()  // failure!
+}
+
+fn heuristic_cost_to_go(current: Position, goal: Position) -> f64 {
+    ((goal.x - current.x).pow(2) + (goal.y - current.y).pow(2)) as f64
 }
 
 
