@@ -12,11 +12,11 @@ from robot_commander.localization.localizer import Localizer
 def main():
     detector = TagDetector()
 
-    _WARMUP_FRAMES = 30
+    warmup_frames = 30
 
     with Camera(device_index=0) as cam:
-        print(f"Warming up camera ({_WARMUP_FRAMES} frames)...")
-        for _ in range(_WARMUP_FRAMES):
+        print(f"Warming up camera ({warmup_frames} frames)...")
+        for _ in range(warmup_frames):
             cam.read()
 
         print("Capturing initialization frame...")

@@ -17,16 +17,18 @@ def _make_frame(height: int = 480, width: int = 640) -> np.ndarray:
     return rng.integers(0, 256, (height, width, 3), dtype=np.uint8)
 
 
-def test_output_is_2d(processor):
+def test_output_is_2d(processor):  # pylint: disable=redefined-outer-name
     result = processor.process(_make_frame())
     assert result.ndim == 2
 
 
-def test_gives_expected_result_for_basic_frame(processor):
+def test_gives_expected_result_for_basic_frame(processor):  # pylint: disable=redefined-outer-name
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     frame[240:, :] = 255  # Half white, half black
     result = processor.process(frame)
     assert result.shape == (480, 640)
     depth_white_side_of_frame = result[240:, :]
     depth_black_side_of_frame = result[:240, :]
-    assert np.mean(depth_white_side_of_frame) < np.mean(depth_black_side_of_frame), "Depth should be greater in the part of the frame that is black"
+    assert np.mean(depth_white_side_of_frame) < np.mean(depth_black_side_of_frame), (
+        "Depth should be greater in the part of the frame that is black"
+    )

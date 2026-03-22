@@ -31,7 +31,9 @@ class Localizer:
         if len(tags) < 2:
             return None
 
-        origin = min(tags, key=lambda t: np.linalg.norm(np.array(t.center) - np.array(self._origin.center)))
+        origin = min(
+            tags, key=lambda t: np.linalg.norm(np.array(t.center) - np.array(self._origin.center))
+        )
         others = [t for t in tags if t is not origin]
         object_to_localize = others[0]  # Assuming one other tag visible
 
