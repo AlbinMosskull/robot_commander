@@ -1,16 +1,17 @@
+use std::fmt;
 
-pub struct MinHeap {
-    heap: Vec<i32>,
+pub struct MinHeap<T> {
+    heap: Vec<T>,
 }
 
-impl MinHeap {
+impl<T: Ord + Copy> MinHeap<T> {
     pub fn new() -> Self {
         MinHeap {
             heap: Vec::new()
         }
     }
 
-    pub fn extract_min(&mut self) -> Option<i32> {
+    pub fn extract_min(&mut self) -> Option<T> {
         if self.len() == 0 {
             return None;
         }
@@ -20,20 +21,13 @@ impl MinHeap {
         Some(min_element)
     }
 
-    pub fn insert(&mut self, element: i32) {
+    pub fn insert(&mut self, element: T) {
         self.heap.push(element);
         self.bubble_up();
     }
 
     pub fn len(&self) -> usize {
         self.heap.len()
-    }
-
-    pub fn simple_print(&self) {
-        for el in &self.heap {
-            print!("{} ", el);
-        }
-        println!("");
     }
 
     fn bubble_up(&mut self) {
@@ -76,7 +70,7 @@ impl MinHeap {
                 return;
             } 
 
-            let mut min_child_index: usize;
+            let min_child_index: usize;
             if right_child >= full_length {
                 min_child_index = left_child;
             } else {
@@ -96,6 +90,15 @@ impl MinHeap {
     }
 }
 
+impl<T: std::fmt::Display> fmt::Display for MinHeap<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for el in &self.heap {
+            write!(f, "{} ", el)?;
+        }
+        writeln!(f)
+    }
+}
+
 
 
 #[cfg(test)]
@@ -104,7 +107,7 @@ mod tests {
 
     #[test]
     fn basic_test() {
-        let mut min_heap = MinHeap::new();
+        let mut min_heap: MinHeap<i32> = MinHeap::new();
         min_heap.insert(1);
         min_heap.insert(1);
         min_heap.insert(1);
@@ -123,7 +126,7 @@ mod tests {
 
     #[test]
     fn basic_test_2() {
-        let mut min_heap = MinHeap::new();
+        let mut min_heap: MinHeap<i32> = MinHeap::new();
         min_heap.insert(4);
         min_heap.insert(5);
         min_heap.insert(1);
@@ -138,13 +141,13 @@ mod tests {
 
     #[test]
     fn extract_min_empty_heap() {
-        let mut min_heap = MinHeap::new();
+        let mut min_heap: MinHeap<i32> = MinHeap::new();
         assert_eq!(min_heap.extract_min(), None);
     }
 
     #[test]
     fn sink_down_smallest_child_swapped() {
-        let mut min_heap = MinHeap::new();
+        let mut min_heap: MinHeap<i32> = MinHeap::new();
         min_heap.insert(1);
         min_heap.insert(2);
         min_heap.insert(5);
@@ -153,7 +156,7 @@ mod tests {
 
     #[test]
     fn sink_down_equal_elements() {
-        let mut min_heap = MinHeap::new();
+        let mut min_heap: MinHeap<i32> = MinHeap::new();
         min_heap.insert(1);
         min_heap.insert(1);
         min_heap.insert(1);
@@ -162,6 +165,5 @@ mod tests {
         min_heap.insert(1);
         min_heap.insert(1);
         assert_eq!(min_heap.extract_min().expect("Should have a value"), 1);
-
     }
 }
