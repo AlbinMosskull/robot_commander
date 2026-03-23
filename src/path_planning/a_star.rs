@@ -9,8 +9,8 @@ use crate::core::min_heap::MinHeap;
 // TODO move to a common data types folder.
 #[derive(Copy, Clone, Hash)] 
 pub struct Position {
-    x: usize,
-    y: usize,
+    x: isize,
+    y: isize,
 }
 
 impl Eq for Position {}
@@ -63,26 +63,52 @@ impl PartialEq for PositionWithCost {
 }
 
 fn reconstruct_path(came_from: &HashMap<Position, Position>, final_position: Position) -> Vec<Position> {
-    let full_path: Vec<Position> = Vec::new();
+    let mut full_path: Vec<Position> = Vec::new();
 
     let mut current_position = final_position;
-    // loop {
-    //     match came_from[current_position]
+    loop {
+        full_path.push(current_position);
 
+        let next = came_from.get(&current_position);
 
-    // }
+        match next {
+            None => break,
+            Some(next) => current_position = *next,
+        }
+    }
     full_path
 }
 
-fn get_neighbors(occ_map: &OccupancyMap, position: Position) -> Vec<PositionWithCost> {
-    let neighbors: Vec<PositionWithCost> = Vec::new();
+fn get_neighbors(occ_map: &OccupancyMap, position: Position) -> Vec<Position> {
+    let mut neighbors: Vec<Position> = Vec::new();
+    let allowed_directions = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+    
+    for (dx, dy) in allowed_directions {
+        let neighbor = Position{
+            x: position.x + dx,
+            y: position.y + dy,
+        };
+
+        if neighbor.x < 0 || neighbor.y < 0 {
+            continue;  // usize is crashing out below due to negative values
+        }
+
+        let neighbor_is_valid = occ_map.is_valid(neighbor.x.try_into().unwrap(), neighbor.y.try_into().unwrap());
+
+        println!("Neighbor with coords {}, {}, is_valid {}", neighbor.x, neighbor.y, neighbor_is_valid);
+
+        if neighbor_is_valid {
+            neighbors.push(neighbor)
+        }
+    }
+
     neighbors
 }
 
 
 pub fn plan_path(occ_map: OccupancyMap, start: Position, goal: Position) -> Vec<Position> {
-    let mut closed: HashSet<Position> = HashSet::new();
     let mut came_from: HashMap<Position, Position> = HashMap::new();
+    let mut best_g_scores: HashMap<Position, f64> = HashMap::new();
     let mut open_set: MinHeap<PositionWithCost> = MinHeap::new();
 
     let costed_start = PositionWithCost {
@@ -91,24 +117,35 @@ pub fn plan_path(occ_map: OccupancyMap, start: Position, goal: Position) -> Vec<
         heuristic_cost_to_go: heuristic_cost_to_go(start, goal),
     };
     open_set.insert(costed_start);
+    best_g_scores.insert(start, 0.0);
     
     while open_set.len() != 0 {
-        let current = open_set.extract_min().expect("While loop checks for empty");
+        let costed_current = open_set.extract_min().expect("While loop checks for empty");
+        let current = costed_current.position;
 
-        if current.position == goal {
-            return reconstruct_path(&came_from, current.position);
+        println!("Investigating position {} {}", current.x, current.y);
+
+        if costed_current.from_start_cost > *best_g_scores.get(&current).expect("Should always have a value") {
+            continue;  // Stale node.
         }
 
-        let mut neighbors = get_neighbors(&occ_map, current.position);
-        for mut neighbor in neighbors {
-            let tenative_cost = current.from_start_cost + 1.0;  // 1 being cost per edge
-            if tenative_cost < neighbor.from_start_cost {
-                // came_from[&neighbor.position] = current.position;
-                if let Some(val) = came_from.get_mut(&neighbor.position) { *val = current.position; }; // No clue what is happening here
-                neighbor.from_start_cost = tenative_cost;
-                // if neighbor ! in open_set {  // TODO need to support this
-                //     open_set.insert(neighbor);
-                // }
+        if current == goal {
+            return reconstruct_path(&came_from, current);
+        }
+
+        let neighbors = get_neighbors(&occ_map, current);
+        for neighbor in neighbors {
+            let tenative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1 being cost per edge
+            if tenative_g_cost < *best_g_scores.get(&neighbor).unwrap_or(&f64::INFINITY) {
+                came_from.insert(neighbor, current);  // Will update if not present.
+                let neighbor_with_cost = PositionWithCost{
+                    position: neighbor,
+                    from_start_cost: tenative_g_cost,
+                    heuristic_cost_to_go: heuristic_cost_to_go(current, goal)
+                };
+                
+                best_g_scores.insert(neighbor, tenative_g_cost);
+                open_set.insert(neighbor_with_cost);
             }
         }
     }
@@ -126,6 +163,19 @@ fn hello_world() {
     let mut priority_queue: MinHeap<i32> = MinHeap::new();
     priority_queue.insert(1);
 
+    let start_position = Position {
+        x: 0,
+        y: 0
+    };
+    let goal_position = Position {
+        x: 2,
+        y: 2
+    };
+
+    let path = plan_path(occ_map, start_position, goal_position);
+    println!("Length of path {}", path.len());
+
+
     println!("Hello, world!");
 
 }
@@ -139,5 +189,24 @@ mod tests {
     fn dummy() {
         hello_world();
         assert!(true);
+    }
+
+    #[test]
+    fn dummy_2(){
+        let mut occ_map = OccupancyMap::new(3, 3);
+        let mut priority_queue: MinHeap<i32> = MinHeap::new();
+        priority_queue.insert(1);
+
+        let start_position = Position {
+            x: 0,
+            y: 0
+        };
+        let goal_position = Position {
+            x: 2,
+            y: 2
+        };
+
+        let path = plan_path(occ_map, start_position, goal_position);
+        assert_eq!(path.len(), 5);
     }
 }

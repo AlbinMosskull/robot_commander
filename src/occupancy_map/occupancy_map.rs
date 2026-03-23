@@ -1,15 +1,25 @@
 pub struct OccupancyMap {
+    num_rows: usize,
+    num_cols: usize,
     is_occupied: Vec<Vec<bool>>,
 }
 
 impl OccupancyMap {
     pub fn new(num_rows: usize, num_cols: usize) -> Self {
         OccupancyMap{
+            num_rows:num_rows,
+            num_cols:num_cols,
             is_occupied: vec![vec![false; num_cols]; num_rows]
         }
     }
-    pub fn is_position_occupied(&self, x: usize, y: usize) -> bool {
-        self.is_occupied[y][x]
+    fn is_within_bounds(&self, x: usize, y: usize) -> bool {
+        let is_x_valid = x >= 0 && x < self.num_cols;
+        let is_y_valid = y >= 0 && y < self.num_rows;
+        is_x_valid && is_y_valid
+    }
+
+    pub fn is_valid(&self, x: usize, y: usize) -> bool {
+        self.is_within_bounds(x, y) && !self.is_occupied[y][x]
     }
 }
 
