@@ -6,35 +6,78 @@ use crate::occupancy_map::occupancy_map::OccupancyMap;
 use crate::core::min_heap::MinHeap;
 
 
-// TODO move to a common data types folder.
-#[derive(Copy, Clone, Hash)] 
-pub struct Position {
-    x: isize,
-    y: isize,
+#[derive(Copy, Clone, Hash, PartialEq, Eq)] 
+pub struct Position2d {
+    pub x: isize,
+    pub y: isize,
 }
 
-impl Eq for Position {}
 
-impl PartialEq for Position {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
+pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) -> Option<Vec<Position2d>> {
+    let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
+    let mut best_g_scores: HashMap<Position2d, f64> = HashMap::new();
+    let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
+
+    let costed_start = Position2dWithCost {
+        position: start,
+        g_cost: 0.0,
+        h_cost: heuristic_cost_to_go(start, goal),
+    };
+    open_set.insert(costed_start);
+    best_g_scores.insert(start, 0.0);
+    
+    while !open_set.empty() {
+        let costed_current = open_set.extract_min().expect("While loop checks for empty");
+        let current = costed_current.position;
+
+        println!("Investigating position {} {}", current.x, current.y);
+
+        if costed_current.g_cost > best_g_scores.get(&current).copied().expect("Should always have a value") {
+            continue;  // A better path to the node has already been added, so we do not need to explore this one.
+        }
+
+        if current == goal {
+            return Some(reconstruct_path(&came_from, current));
+        }
+
+        let neighbors = get_neighbors(&occ_map, current);
+        let tentative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1.0 being cost per edge
+        for neighbor in neighbors {
+            if tentative_g_cost < best_g_scores.get(&neighbor).copied().unwrap_or(f64::INFINITY) {
+                came_from.insert(neighbor, current);  // insert will update if key is present.
+                let neighbor_with_cost = Position2dWithCost{
+                    position: neighbor,
+                    g_cost: tentative_g_cost,
+                    h_cost: heuristic_cost_to_go(neighbor, goal)
+                };
+                
+                best_g_scores.insert(neighbor, tentative_g_cost);
+                open_set.insert(neighbor_with_cost);
+            }
+        }
     }
+
+    // Could not reach the goal
+    None
 }
+
+
 
 #[derive(Copy, Clone)] 
-struct PositionWithCost {
-    position: Position,
-    from_start_cost: f64,  // g-cost
-    heuristic_cost_to_go: f64,  // h-cost
+struct Position2dWithCost {
+    position: Position2d,
+    g_cost: f64,
+    h_cost: f64,
 }
 
-impl PositionWithCost {
-    pub fn get_total_cost(&self) -> f64 {
-        self.from_start_cost + self.heuristic_cost_to_go
+
+impl Position2dWithCost {
+    fn get_total_cost(&self) -> f64 {
+        self.g_cost + self.h_cost
     }
 }
 
-impl Ord for PositionWithCost {
+impl Ord for Position2dWithCost {
     fn cmp(&self, other: &Self) -> Ordering {
         let diff = self.get_total_cost() - other.get_total_cost();
         if diff < 0.0 {
@@ -47,23 +90,22 @@ impl Ord for PositionWithCost {
     }
 }
 
-impl PartialOrd for PositionWithCost {
+impl PartialOrd for Position2dWithCost {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Eq for PositionWithCost {}
+impl Eq for Position2dWithCost {}
 
-impl PartialEq for PositionWithCost {
+impl PartialEq for Position2dWithCost {
     fn eq(&self, other: &Self) -> bool {
-        const EPS: f64 = 1e-6;
-        (self.get_total_cost() - other.get_total_cost()).abs() < EPS
+        self.get_total_cost() == other.get_total_cost()
     }
 }
 
-fn reconstruct_path(came_from: &HashMap<Position, Position>, final_position: Position) -> Vec<Position> {
-    let mut full_path: Vec<Position> = Vec::new();
+fn reconstruct_path(came_from: &HashMap<Position2d, Position2d>, final_position: Position2d) -> Vec<Position2d> {
+    let mut full_path: Vec<Position2d> = Vec::new();
 
     let mut current_position = final_position;
     loop {
@@ -76,29 +118,25 @@ fn reconstruct_path(came_from: &HashMap<Position, Position>, final_position: Pos
             Some(next) => current_position = *next,
         }
     }
+    full_path.reverse();
     full_path
 }
 
-fn get_neighbors(occ_map: &OccupancyMap, position: Position) -> Vec<Position> {
-    let mut neighbors: Vec<Position> = Vec::new();
-    let allowed_directions = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+fn get_neighbors(occ_map: &OccupancyMap, position: Position2d) -> Vec<Position2d> {
+    let mut neighbors = Vec::new();
+    const ALLOWED_DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
     
-    for (dx, dy) in allowed_directions {
-        let neighbor = Position{
+    for (dx, dy) in ALLOWED_DIRECTIONS {
+        let neighbor = Position2d{
             x: position.x + dx,
             y: position.y + dy,
         };
 
-        if neighbor.x < 0 || neighbor.y < 0 {
-            continue;  // usize is crashing out below due to negative values
-        }
-
-        let neighbor_is_valid = occ_map.is_valid(neighbor.x.try_into().unwrap(), neighbor.y.try_into().unwrap());
-
-        println!("Neighbor with coords {}, {}, is_valid {}", neighbor.x, neighbor.y, neighbor_is_valid);
-
-        if neighbor_is_valid {
-            neighbors.push(neighbor)
+        if let (Ok(x), Ok(y)) = (neighbor.x.try_into(),neighbor.y.try_into()) {                                         
+            if occ_map.is_valid(x, y) {
+                println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
+                neighbors.push(neighbor);                                
+            }           
         }
     }
 
@@ -106,79 +144,12 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position) -> Vec<Position> {
 }
 
 
-pub fn plan_path(occ_map: OccupancyMap, start: Position, goal: Position) -> Vec<Position> {
-    let mut came_from: HashMap<Position, Position> = HashMap::new();
-    let mut best_g_scores: HashMap<Position, f64> = HashMap::new();
-    let mut open_set: MinHeap<PositionWithCost> = MinHeap::new();
-
-    let costed_start = PositionWithCost {
-        position: start,
-        from_start_cost: 0.0,
-        heuristic_cost_to_go: heuristic_cost_to_go(start, goal),
-    };
-    open_set.insert(costed_start);
-    best_g_scores.insert(start, 0.0);
-    
-    while open_set.len() != 0 {
-        let costed_current = open_set.extract_min().expect("While loop checks for empty");
-        let current = costed_current.position;
-
-        println!("Investigating position {} {}", current.x, current.y);
-
-        if costed_current.from_start_cost > *best_g_scores.get(&current).expect("Should always have a value") {
-            continue;  // Stale node.
-        }
-
-        if current == goal {
-            return reconstruct_path(&came_from, current);
-        }
-
-        let neighbors = get_neighbors(&occ_map, current);
-        for neighbor in neighbors {
-            let tenative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1 being cost per edge
-            if tenative_g_cost < *best_g_scores.get(&neighbor).unwrap_or(&f64::INFINITY) {
-                came_from.insert(neighbor, current);  // Will update if not present.
-                let neighbor_with_cost = PositionWithCost{
-                    position: neighbor,
-                    from_start_cost: tenative_g_cost,
-                    heuristic_cost_to_go: heuristic_cost_to_go(current, goal)
-                };
-                
-                best_g_scores.insert(neighbor, tenative_g_cost);
-                open_set.insert(neighbor_with_cost);
-            }
-        }
-    }
-
-    Vec::new()  // failure!
-}
-
-fn heuristic_cost_to_go(current: Position, goal: Position) -> f64 {
-    ((goal.x - current.x).pow(2) + (goal.y - current.y).pow(2)) as f64
+fn heuristic_cost_to_go(current: Position2d, goal: Position2d) -> f64 {
+    ((goal.x - current.x).abs() + (goal.y - current.y).abs()) as f64
 }
 
 
-fn hello_world() {
-    let mut occ_map = OccupancyMap::new(3, 3);
-    let mut priority_queue: MinHeap<i32> = MinHeap::new();
-    priority_queue.insert(1);
 
-    let start_position = Position {
-        x: 0,
-        y: 0
-    };
-    let goal_position = Position {
-        x: 2,
-        y: 2
-    };
-
-    let path = plan_path(occ_map, start_position, goal_position);
-    println!("Length of path {}", path.len());
-
-
-    println!("Hello, world!");
-
-}
 
 
 #[cfg(test)]
@@ -186,27 +157,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dummy() {
-        hello_world();
-        assert!(true);
-    }
-
-    #[test]
-    fn dummy_2(){
+    fn basic_test_1(){
         let mut occ_map = OccupancyMap::new(3, 3);
-        let mut priority_queue: MinHeap<i32> = MinHeap::new();
-        priority_queue.insert(1);
-
-        let start_position = Position {
+        let start_position = Position2d {
             x: 0,
             y: 0
         };
-        let goal_position = Position {
+        let goal_position = Position2d {
             x: 2,
             y: 2
         };
 
-        let path = plan_path(occ_map, start_position, goal_position);
+        let path = plan_path(&occ_map, start_position, goal_position).expect("Should find a path here");
         assert_eq!(path.len(), 5);
     }
 }
