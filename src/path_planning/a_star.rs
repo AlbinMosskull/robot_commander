@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::cmp::Ordering;
 
 use crate::occupancy_map::occupancy_map::OccupancyMap;
