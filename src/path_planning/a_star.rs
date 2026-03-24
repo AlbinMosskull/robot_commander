@@ -26,7 +26,7 @@ pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) ->
     open_set.insert(costed_start);
     best_g_scores.insert(start, 0.0);
     
-    while !open_set.empty() {
+    while open_set.len() > 0 {
         let costed_current = open_set.extract_min().expect("While loop checks for empty");
         let current = costed_current.position;
 
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn basic_test_1(){
-        let mut occ_map = OccupancyMap::new(3, 3);
+        let occ_map = OccupancyMap::new(3, 3);
         let start_position = Position2d {
             x: 0,
             y: 0
