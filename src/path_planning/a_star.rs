@@ -14,7 +14,7 @@ pub struct Position2d {
 
 pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) -> Option<Vec<Position2d>> {
     let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
-    let mut best_g_scores: HashMap<Position2d, f64> = HashMap::new();
+    let mut best_g_scores: HashMap<Position2d, f32> = HashMap::new();
     let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
 
     let costed_start = Position2dWithCost {
@@ -42,7 +42,7 @@ pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) ->
         let neighbors = get_neighbors(&occ_map, current);
         let tentative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1.0 being cost per edge
         for neighbor in neighbors {
-            if tentative_g_cost < best_g_scores.get(&neighbor).copied().unwrap_or(f64::INFINITY) {
+            if tentative_g_cost < best_g_scores.get(&neighbor).copied().unwrap_or(f32::INFINITY) {
                 came_from.insert(neighbor, current);  // insert will update if key is present.
                 let neighbor_with_cost = Position2dWithCost{
                     position: neighbor,
@@ -65,13 +65,13 @@ pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) ->
 #[derive(Copy, Clone)] 
 struct Position2dWithCost {
     position: Position2d,
-    g_cost: f64,
-    h_cost: f64,
+    g_cost: f32,
+    h_cost: f32,
 }
 
 
 impl Position2dWithCost {
-    fn get_total_cost(&self) -> f64 {
+    fn get_total_cost(&self) -> f32 {
         self.g_cost + self.h_cost
     }
 }
@@ -132,7 +132,7 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d) -> Vec<Position2d
         };
 
         if let (Ok(x), Ok(y)) = (neighbor.x.try_into(),neighbor.y.try_into()) {                                         
-            if occ_map.is_valid(x, y) {
+            if occ_map.is_valid_index(x, y) {
                 println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
                 neighbors.push(neighbor);                                
             }           
@@ -143,8 +143,8 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d) -> Vec<Position2d
 }
 
 
-fn heuristic_cost_to_go(current: Position2d, goal: Position2d) -> f64 {
-    ((goal.x - current.x).abs() + (goal.y - current.y).abs()) as f64
+fn heuristic_cost_to_go(current: Position2d, goal: Position2d) -> f32 {
+    ((goal.x - current.x).abs() + (goal.y - current.y).abs()) as f32
 }
 
 
@@ -157,7 +157,8 @@ mod tests {
 
     #[test]
     fn basic_test_1(){
-        let occ_map = OccupancyMap::new(3, 3);
+        let mut occ_map = OccupancyMap::new(3, 3, 0.1, 0.0, 0.0);
+        occ_map.set_all_unoccupied();
         let start_position = Position2d {
             x: 0,
             y: 0

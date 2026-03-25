@@ -3,5 +3,23 @@
 version = 4
 
 [[package]]
+name = "bresenham"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfc1116225f66d2ea341a26503f83a6b1205070a6f7199ce1f1550ead91f6fd7"
+
+[[package]]
+name = "line_drawing"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad90af9c3a74a486203835ec0aafe030f3e68ed50d737692f96a79368c2bff20"
+dependencies = [
+ "bresenham",
+]
+
+[[package]]
 name = "robot_commander"
 version = "0.1.0"
+dependencies = [
+ "line_drawing",
+]
