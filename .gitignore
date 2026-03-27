@@ -1,8 +1,10 @@
+# Project
+images/
+
 # Python
 .venv/
 __pycache__/
 *.egg-info/
-
 
 # Rust
 /target
