@@ -1,6 +1,6 @@
 import numpy as np
 
-from robot_commander.camera.intrinsics import Intrinsics
+from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 
 

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from robot_commander.camera.tag_detector import DetectedTag, TagDetector
+from robot_commander.image_processing.tag_detector import DetectedTag, TagDetector
 
 
 class Localizer:

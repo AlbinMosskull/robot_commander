@@ -16,7 +16,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander.camera.intrinsics import Intrinsics
+from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.config import load as load_config
 
 _cfg = load_config()

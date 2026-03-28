@@ -13,7 +13,7 @@ Press 'q' to quit.
 import cv2
 import numpy as np
 
-from robot_commander.camera.camera import Camera
+from robot_commander.image_processing.camera import Camera
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
 from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult

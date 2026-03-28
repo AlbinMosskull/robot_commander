@@ -5,7 +5,7 @@ Script to visualise instance segmentation on live camera frames.
 import cv2
 import numpy as np
 
-from robot_commander.camera.camera import Camera
+from robot_commander.image_processing.camera import Camera
 from robot_commander.semantic_understanding.semantic_segmentor import (
     SemanticSegmentor,
     SegmentationResult,

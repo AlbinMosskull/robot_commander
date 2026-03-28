@@ -4,8 +4,8 @@ Script to open the webcam and visualize detected ArUco tags.
 
 import cv2
 
-from robot_commander.camera.camera import Camera
-from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.image_processing.camera import Camera
+from robot_commander.image_processing.tag_detector import TagDetector, draw_tags
 from robot_commander.config import load as load_config
 
 _cfg = load_config()

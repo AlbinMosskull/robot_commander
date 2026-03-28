@@ -8,9 +8,9 @@ Show two AprilTags and press C to calibrate, then Q to quit.
 import cv2
 import numpy as np
 
-from robot_commander.camera import intrinsics as cal
-from robot_commander.camera.camera import Camera
-from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.image_processing import intrinsics as cal
+from robot_commander.image_processing.camera import Camera
+from robot_commander.image_processing.tag_detector import TagDetector, draw_tags
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.localization.localizer import Localizer

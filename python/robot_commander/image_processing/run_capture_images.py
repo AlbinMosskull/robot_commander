@@ -14,7 +14,7 @@ from pathlib import Path
 
 import cv2
 
-from robot_commander.camera.camera import Camera
+from robot_commander.image_processing.camera import Camera
 from robot_commander.config import load as load_config
 
 SAVE_DIR = Path("images/captured_images")

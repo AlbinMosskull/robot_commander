@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from robot_commander.camera.tag_detector import DetectedTag
+from robot_commander.image_processing.tag_detector import DetectedTag
 from robot_commander.localization.localizer import Localizer
 
 _BLANK_FRAME = np.zeros((300, 300, 3), dtype=np.uint8)
