@@ -7,7 +7,7 @@ Instead of hand-drawn ROIs, object masks are produced automatically:
   3. SAM refines each merged box into a precise mask.
   4. Masks are filtered to the target classes and used downstream.
 
-Outputs to output/debug/:
+Outputs to plots/debug/:
   01_frame.jpg          — raw captured frame
   02_depth.png          — depth colormap
   03_depth_overlay.jpg  — depth colormap blended over RGB
@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.image_processing.camera import WebCamera
+from robot_commander.image_processing.camera import FromFileCamera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
@@ -53,7 +53,7 @@ from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
 from robot_commander.semantic_understanding.types import SegmentationResult
 
 _cfg = load_config()
-_DEBUG_DIR = Path("output/debug")
+_DEBUG_DIR = Path("plots/debug")
 
 _CLASS_COLORS_BGR = {
     "dining table": (0,  80, 220),  # red-ish
@@ -366,7 +366,8 @@ def _main():
     print("Loading SAM model...")
     sam = SamSegmentor()
 
-    with WebCamera() as cam:
+    image_path = Path("images/example_input/scene_image.jpg")
+    with FromFileCamera(image_path) as cam:
         cam.warm_up()
         calib_result = _auto_calibrate(cam, depth_processor, detector_model, localizer)
         if calib_result is None:

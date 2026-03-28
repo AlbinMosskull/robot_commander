@@ -21,7 +21,7 @@ import cv2
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.image_processing.camera import WebCamera
+from robot_commander.image_processing.camera import WebCamera, Camera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor, DepthCalibration
@@ -43,7 +43,7 @@ _FRAME_INTERVAL_S = 0.3  # seconds between captures
 _MAP_SCALE = 150         # pixels per metre
 _MAP_W, _MAP_H = 600, 600
 _MAP_ORIGIN = (300, 540) # camera position in map pixels (x, y from top-left)
-_OUTPUT_DIR = Path("output")
+_OUTPUT_DIR = Path("plots")
 _MIN_OBJECT_HEIGHT = 0.10  # metres above floor — ignore points below this (floor noise)
 _MAX_OBJECT_HEIGHT = 1.50  # metres above floor — ignore points above this (ceiling / walls)
 _MAX_SURFACE_TILT_DEG = 40  # reject RANSAC planes tilted more than this from horizontal
