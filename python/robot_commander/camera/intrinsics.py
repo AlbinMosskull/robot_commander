@@ -3,8 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-# parents[3] from this file: camera/ -> robot_commander/ -> python/ -> repo root
-_DEFAULT_PATH = Path(__file__).parents[3] / "intrinsics" / "intrinsics.npz"
+_DEFAULT_PATH = Path("intrinsics/intrinsics.npz")
 
 
 @dataclass
@@ -29,6 +28,23 @@ class Intrinsics:
     @property
     def cy(self) -> float:
         return float(self.camera_matrix[1, 2])
+
+    def crop(self, x1: int, y1: int) -> "Intrinsics":
+        """Return intrinsics adjusted for a crop whose top-left corner is (x1, y1).
+
+        Only the principal point (cx, cy) changes — focal lengths are unaffected by
+        cropping. The bottom-right corner of the crop is irrelevant: back-projection
+        depends only on each pixel's offset from the principal point, not on image bounds.
+        """
+        matrix = self.camera_matrix.copy()
+        matrix[0, 2] -= x1
+        matrix[1, 2] -= y1
+        return Intrinsics(
+            camera_matrix=matrix,
+            dist_coeffs=self.dist_coeffs,
+            rms_error=self.rms_error,
+            image_size=self.image_size,
+        )
 
     def save(self, path: Path) -> None:
         np.savez(

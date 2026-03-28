@@ -251,7 +251,6 @@ def _main():
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor(localizer)
     segmentor = SemanticSegmentor()
-    fx, fy, cx, cy = intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy
 
     with Camera(device_index=0) as cam:
         cam.warm_up()
@@ -285,7 +284,7 @@ def _main():
         else:
             depth = depth_processor.process(frame)
 
-        pts = depth_image_to_point_cloud(depth, fx, fy, cx, cy)
+        pts = depth_image_to_point_cloud(depth, intrinsics)
         all_scene_points.append(pts)
 
         seg_results = segmentor.process(frame)
@@ -303,7 +302,7 @@ def _main():
 
             masked_depth = depth.copy()
             masked_depth[~combined_mask] = 0.0
-            obj_pts = depth_image_to_point_cloud(masked_depth, fx, fy, cx, cy)
+            obj_pts = depth_image_to_point_cloud(masked_depth, intrinsics)
             if len(obj_pts) > 0:
                 class_points[canonical].append(obj_pts)
 

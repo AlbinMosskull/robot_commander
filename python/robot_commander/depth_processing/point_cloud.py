@@ -1,12 +1,11 @@
 import numpy as np
 
+from robot_commander.camera.intrinsics import Intrinsics
+
 
 def depth_image_to_point_cloud(
     depth: np.ndarray,
-    fx: float,
-    fy: float,
-    cx: float,
-    cy: float,
+    intrinsics: Intrinsics,
 ) -> np.ndarray:
     """Back-project a depth image to a 3-D point cloud using the pinhole model.
 
@@ -14,10 +13,7 @@ def depth_image_to_point_cloud(
 
     Args:
         depth: Depth map (H, W) in any consistent unit.
-        fx: Focal length along x in pixels.
-        fy: Focal length along y in pixels.
-        cx: Principal-point x coordinate in pixels.
-        cy: Principal-point y coordinate in pixels.
+        intrinsics: Camera intrinsics.
 
     Returns:
         Float32 array of shape (N, 3) — each row is an (X, Y, Z) point in
@@ -28,7 +24,7 @@ def depth_image_to_point_cloud(
 
     valid = depth > 0
     z = depth[valid].astype(np.float32)
-    x = (uu[valid] - cx) * z / fx
-    y = (vv[valid] - cy) * z / fy
+    x = (uu[valid] - intrinsics.cx) * z / intrinsics.fx
+    y = (vv[valid] - intrinsics.cy) * z / intrinsics.fy
 
     return np.stack([x, y, z], axis=-1)

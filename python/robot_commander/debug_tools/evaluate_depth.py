@@ -30,10 +30,8 @@ _ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
 _TAG_SIZE = 0.03  # physical side length of the AprilTags in metres
 
 
-def _load_intrinsics() -> tuple[float, float, float, float]:
-    intr = cal.load()
-    K = intr.camera_matrix
-    return float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2])
+def _load_intrinsics() -> cal.Intrinsics:
+    return cal.load()
 
 
 def _load_cached_roi() -> np.ndarray | None:
@@ -252,7 +250,7 @@ def main():
     mask_crop, (x1, y1, x2, y2) = _roi_mask_and_bbox(roi_points, frame.shape)
     print(f"Selected ROI bounding box: ({x1}, {y1}) → ({x2}, {y2})")
 
-    fx, fy, cx, cy = _load_intrinsics()
+    intrinsics = _load_intrinsics()
 
     print("Running depth estimation...")
     depth_full = processor.last_calibrated_depth  # reuse depth computed during calibration
@@ -261,11 +259,8 @@ def main():
     # Zero out pixels outside the polygon so they are excluded from point cloud
     depth_crop[~mask_crop] = 0.0
 
-    cx_crop = cx - x1
-    cy_crop = cy - y1
-
     print("Building point cloud...")
-    points = depth_image_to_point_cloud(depth_crop, fx, fy, cx_crop, cy_crop)
+    points = depth_image_to_point_cloud(depth_crop, intrinsics.crop(x1, y1))
 
     if len(points) < 10:
         print("Not enough valid depth points in the selected region.")

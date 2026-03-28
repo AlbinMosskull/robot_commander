@@ -7,8 +7,6 @@ import numpy as np
 class Plane:
     """A plane detected in a point cloud.
 
-    The plane satisfies the equation: normal *P x = distance.
-
     Attributes:
         normal: Unit normal vector, shape (3,).
         distance: Signed distance from the origin along the normal.

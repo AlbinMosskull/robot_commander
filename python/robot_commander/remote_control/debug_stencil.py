@@ -260,7 +260,7 @@ def _class_surface_overlay(
     frame: np.ndarray,
     depth: np.ndarray,
     obj_mask: np.ndarray,
-    fx: float, fy: float, cx_: float, cy_: float,
+    intrinsics: cal.Intrinsics,
     n_floor: np.ndarray, d_floor: float,
     u_vec: np.ndarray, v_vec: np.ndarray,
     label: str,
@@ -276,7 +276,7 @@ def _class_surface_overlay(
     """
     masked_depth = depth.copy()
     masked_depth[~obj_mask] = 0.0
-    obj_pts = depth_image_to_point_cloud(masked_depth, fx, fy, cx_, cy_)
+    obj_pts = depth_image_to_point_cloud(masked_depth, intrinsics)
 
     if len(obj_pts) < 10:
         print(f"  [{label}] too few points ({len(obj_pts)})")
@@ -359,7 +359,6 @@ def _main():
     localizer = Localizer(detector_model, intrinsics.camera_matrix, _TAG_SIZE,
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor(localizer)
-    fx, fy, cx, cy = intrinsics.fx, intrinsics.fy, intrinsics.cx, intrinsics.cy
 
     print("Loading DETR detection model...")
     detr = DetectionSegmentor()
@@ -417,7 +416,7 @@ def _main():
         print(f"  Mask overlap '{labs[0]}' ∩ '{labs[1]}': {overlap} px")
 
     # ── 05: floor RANSAC ──────────────────────────────────────────────────────
-    all_pts0 = depth_image_to_point_cloud(depth0, fx, fy, cx, cy)
+    all_pts0 = depth_image_to_point_cloud(depth0, intrinsics)
     print(f"\n[POINT CLOUD] {len(all_pts0)} points (frame 0)")
 
     floor_planes = detect_planes(all_pts0, n_planes=1, n_iterations=500,
@@ -455,7 +454,7 @@ def _main():
     for canonical, obj_mask in target_masks.items():
         fname = "06_table_surface.jpg" if "table" in canonical else "07_couch_surface.jpg"
         _class_surface_overlay(
-            frames[0], depth0, obj_mask, fx, fy, cx, cy,
+            frames[0], depth0, obj_mask, intrinsics,
             n_floor, d_floor, u_vec, v_vec, canonical, _DEBUG_DIR / fname,
         )
 
@@ -474,7 +473,7 @@ def _main():
             mask = _resize_mask_to(frame_mask, depth.shape)
             md = depth.copy()
             md[~mask] = 0.0
-            pts = depth_image_to_point_cloud(md, fx, fy, cx, cy)
+            pts = depth_image_to_point_cloud(md, intrinsics)
             if len(pts):
                 pts_list.append(pts)
 

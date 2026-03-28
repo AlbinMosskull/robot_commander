@@ -1,5 +1,6 @@
 """
 Script to capture images from the webcam with approve/deny flow.
+Useful for collecting images for calibration.
 
 Controls:
   SPACE  - capture a frame
