@@ -1,22 +1,9 @@
-"""
-Script to visualise object detection + SAM segmentation on live camera frames.
-
-For each frame:
-  1. DETR detects objects and produces bounding boxes.
-  2. Overlapping boxes of the same class are merged into one.
-  3. SAM refines each merged box into a precise mask.
-  4. The result is rendered as a coloured mask overlay with labels.
-
-Press 'q' to quit.
-"""
-
 import cv2
 import numpy as np
 
 from robot_commander.image_processing.camera import Camera
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
-from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
-from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
+from robot_commander.semantic_understanding.types import SegmentationResult
 
 _PALETTE = [
     (0, 100, 255),
@@ -30,60 +17,8 @@ _PALETTE = [
 ]
 
 
-def _merge_overlapping_boxes(
-    detections: list[SegmentationResult],
-) -> list[tuple[str, float, tuple[int, int, int, int]]]:
-    """
-    Group detections by label and merge any boxes that overlap.
-
-    Two boxes are merged when they share any pixel area. Merging is repeated
-    until no overlapping pair remains (handles transitive overlaps).
-
-    Returns:
-        List of (label, best_score, (x1, y1, x2, y2)) — one entry per merged group.
-    """
-    # Collect bboxes per label from the rectangular masks.
-    by_label: dict[str, list[list]] = {}
-    for det in detections:
-        ys, xs = np.where(det.mask)
-        if len(xs) == 0:
-            continue
-        box = [det.score, int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
-        by_label.setdefault(det.label, []).append(box)
-
-    merged_prompts: list[tuple[str, float, tuple[int, int, int, int]]] = []
-    for label, boxes in by_label.items():
-        # Repeatedly scan for overlapping pairs and merge them.
-        changed = True
-        while changed:
-            changed = False
-            out: list[list] = []
-            used = [False] * len(boxes)
-            for i in range(len(boxes)):
-                if used[i]:
-                    continue
-                s, ax1, ay1, ax2, ay2 = boxes[i]
-                for j in range(i + 1, len(boxes)):
-                    if used[j]:
-                        continue
-                    sj, bx1, by1, bx2, by2 = boxes[j]
-                    if ax1 <= bx2 and bx1 <= ax2 and ay1 <= by2 and by1 <= ay2:
-                        ax1, ay1 = min(ax1, bx1), min(ay1, by1)
-                        ax2, ay2 = max(ax2, bx2), max(ay2, by2)
-                        s = max(s, sj)
-                        used[j] = True
-                        changed = True
-                out.append([s, ax1, ay1, ax2, ay2])
-            boxes = out
-
-        for s, x1, y1, x2, y2 in boxes:
-            merged_prompts.append((label, s, (x1, y1, x2, y2)))
-
-    return merged_prompts
-
 
 def _draw_results(frame: np.ndarray, results: list[SegmentationResult]) -> np.ndarray:
-    """Return a copy of *frame* with SAM mask overlays, bounding boxes, and labels."""
     overlay = frame.copy()
     for i, res in enumerate(reversed(results)):
         colour = _PALETTE[i % len(_PALETTE)]
@@ -111,10 +46,8 @@ def _draw_results(frame: np.ndarray, results: list[SegmentationResult]) -> np.nd
 
 
 def main():
-    print("Loading DETR object detection model...")
-    detector = DetectionSegmentor()
-    print("Loading SAM model...")
-    sam = SamSegmentor()
+    print("Loading models...")
+    segmentor = DetectionSegmentor()
     print("Models loaded. Press 'q' to quit.")
 
     with Camera() as cam:
@@ -124,9 +57,7 @@ def main():
                 print("Failed to read frame.")
                 break
 
-            detections = detector.process(frame)
-            prompts = _merge_overlapping_boxes(detections)
-            sam_results = sam.process(frame, prompts)
+            sam_results = segmentor.process(frame)
             vis = _draw_results(frame, sam_results)
 
             label_counts: dict[str, int] = {}

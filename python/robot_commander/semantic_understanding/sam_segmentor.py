@@ -4,20 +4,10 @@ import torch
 from PIL import Image
 from transformers import SamModel, SamProcessor
 
-from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
+from robot_commander.semantic_understanding.types import SegmentationResult
 
 
 class SamSegmentor:
-    """
-    Refines bounding-box regions using SAM (Segment Anything Model).
-
-    Given a frame and a list of (label, score, bbox) prompts, runs SAM with
-    each bounding box as a prompt and returns precise segmentation masks.
-
-    Args:
-        model: HuggingFace model ID for SAM.
-    """
-
     def __init__(self, model: str = "facebook/sam-vit-base"):
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._model = SamModel.from_pretrained(model).to(self._device)

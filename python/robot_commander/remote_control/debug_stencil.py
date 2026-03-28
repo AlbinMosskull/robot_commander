@@ -48,9 +48,9 @@ from robot_commander.remote_control.main import (
     _NUM_FRAMES, _FRAME_INTERVAL_S,
     _MIN_OBJECT_HEIGHT, _MAX_OBJECT_HEIGHT, _MAX_SURFACE_TILT_DEG,
 )
-from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
+from robot_commander.semantic_understanding.object_detection import ObjectDetector
 from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
-from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
+from robot_commander.semantic_understanding.types import SegmentationResult
 
 _cfg = load_config()
 _DEBUG_DIR = Path("output/debug")
@@ -110,7 +110,7 @@ def _merge_overlapping_boxes(
 
 def _detect_object_masks(
     frame: np.ndarray,
-    detector: DetectionSegmentor,
+    detector: ObjectDetector,
     sam: SamSegmentor,
 ) -> dict[str, np.ndarray]:
     """
@@ -362,7 +362,7 @@ def _main():
     depth_processor = CalibratedDepthProcessor(localizer)
 
     print("Loading DETR detection model...")
-    detr = DetectionSegmentor()
+    detr = ObjectDetector()
     print("Loading SAM model...")
     sam = SamSegmentor()
 
