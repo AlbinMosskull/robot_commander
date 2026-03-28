@@ -42,9 +42,7 @@ from robot_commander.depth_processing.calibrated_depth_processor import Calibrat
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
-from robot_commander.semantic_understanding.object_detection import ObjectDetector
-from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
-from robot_commander.semantic_understanding.types import SegmentationResult
+from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 
 _cfg = load_config()
 _DEBUG_DIR = Path("plots/debug")
@@ -239,71 +237,6 @@ def _draw_stencil_map(
 
     _draw_camera_symbol(canvas, intr)
     return canvas
-
-
-# ── Model-based mask detection ─────────────────────────────────────────────────
-
-def _merge_overlapping_boxes(
-    detections: list[SegmentationResult],
-) -> list[tuple[str, float, tuple[int, int, int, int]]]:
-    """Merge overlapping same-class bounding boxes into unified boxes."""
-    by_label: dict[str, list[list]] = {}
-    for det in detections:
-        ys, xs = np.where(det.mask)
-        if len(xs) == 0:
-            continue
-        box = [det.score, int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
-        by_label.setdefault(det.label, []).append(box)
-
-    prompts: list[tuple[str, float, tuple[int, int, int, int]]] = []
-    for label, boxes in by_label.items():
-        changed = True
-        while changed:
-            changed = False
-            out: list[list] = []
-            used = [False] * len(boxes)
-            for i in range(len(boxes)):
-                if used[i]:
-                    continue
-                s, ax1, ay1, ax2, ay2 = boxes[i]
-                for j in range(i + 1, len(boxes)):
-                    if used[j]:
-                        continue
-                    sj, bx1, by1, bx2, by2 = boxes[j]
-                    if ax1 <= bx2 and bx1 <= ax2 and ay1 <= by2 and by1 <= ay2:
-                        ax1, ay1 = min(ax1, bx1), min(ay1, by1)
-                        ax2, ay2 = max(ax2, bx2), max(ay2, by2)
-                        s = max(s, sj)
-                        used[j] = True
-                        changed = True
-                out.append([s, ax1, ay1, ax2, ay2])
-            boxes = out
-
-        for s, x1, y1, x2, y2 in boxes:
-            prompts.append((label, s, (x1, y1, x2, y2)))
-
-    return prompts
-
-
-def _detect_object_masks(
-    frame: np.ndarray,
-    detector: ObjectDetector,
-    sam: SamSegmentor,
-) -> dict[str, np.ndarray]:
-    detections = detector.process(frame)
-    detections = [d for d in detections if d.label in _TARGET_LABELS]
-    prompts = _merge_overlapping_boxes(detections)
-    prompts = [(lbl, sc, box) for lbl, sc, box in prompts if lbl in _TARGET_LABELS]
-    sam_results = sam.process(frame, prompts)
-
-    masks: dict[str, np.ndarray] = {}
-    for res in sam_results:
-        if res.label in masks:
-            masks[res.label] |= res.mask
-        else:
-            masks[res.label] = res.mask.copy()
-
-    return masks
 
 
 def _resize_mask_to(mask: np.ndarray, shape: tuple) -> np.ndarray:
@@ -532,10 +465,8 @@ def _main():
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor()
 
-    print("Loading DETR detection model...")
-    detr = ObjectDetector()
-    print("Loading SAM model...")
-    sam = SamSegmentor()
+    print("Loading DETR + SAM models...")
+    segmentor = DetectionSegmentor()
 
     image_path = Path("images/example_input/scene_image.jpg")
     with FromFileCamera(image_path) as cam:
@@ -573,7 +504,11 @@ def _main():
 
     # ── 04: model-predicted masks ─────────────────────────────────────────────
     print("\nRunning DETR + SAM to detect object masks...")
-    frame_masks = _detect_object_masks(frames[0], detr, sam)
+    frame_masks = {
+        r.label: r.mask
+        for r in segmentor.process(frames[0])
+        if r.label in _TARGET_LABELS
+    }
     print(f"  Detected classes: {list(frame_masks.keys())}")
     _save_mask_vis(frames[0], frame_masks, _DEBUG_DIR / "04_roi_masks.jpg")
 
