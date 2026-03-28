@@ -43,8 +43,10 @@ from robot_commander.depth_processing.point_cloud import depth_image_to_point_cl
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
-from robot_commander.remote_control.map_drawing import (
-    _MAP_W, _MAP_H, draw_stencil_map, to_map_px,
+from robot_commander.remote_control.map_drawing import draw_stencil_map
+from robot_commander.remote_control.map_geometry import (
+    MAX_SURFACE_TILT_DEG, floor_basis, to_floor_2d,
+    filter_above_floor, largest_floor_component, build_footprints,
 )
 
 _cfg = load_config()
@@ -57,9 +59,6 @@ _OBJECT_CLASSES: dict[str, str] = {
 }
 _NUM_FRAMES = 5
 _FRAME_INTERVAL_S = 0.3
-_MIN_OBJECT_HEIGHT = 0.10
-_MAX_OBJECT_HEIGHT = 1.50
-_MAX_SURFACE_TILT_DEG = 40
 
 _CLASS_COLORS_BGR = {
     "dining table": (0,  80, 220),  # red-ish
@@ -68,70 +67,6 @@ _CLASS_COLORS_BGR = {
 }
 
 _TARGET_LABELS = set(_OBJECT_CLASSES.values())
-
-
-# ── Floor coordinate system ────────────────────────────────────────────────────
-
-def _floor_basis(normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Return (u=right, v=forward) unit vectors lying in the floor plane."""
-    x_cam = np.array([1.0, 0.0, 0.0])
-    u = x_cam - (x_cam @ normal) * normal
-    if np.linalg.norm(u) < 1e-6:
-        x_cam = np.array([0.0, 0.0, 1.0])
-        u = x_cam - (x_cam @ normal) * normal
-    u /= np.linalg.norm(u)
-    v = np.cross(normal, u)
-    v /= np.linalg.norm(v)
-    return u, v
-
-
-def _to_floor_2d(points: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """Project 3D camera-space points to (right, forward) floor coordinates."""
-    return np.column_stack([points @ u, points @ v])
-
-
-def _filter_above_floor(
-    points: np.ndarray, n_floor: np.ndarray, d_floor: float
-) -> np.ndarray:
-    """Return boolean mask of points within the plausible furniture height range."""
-    heights = points @ n_floor - d_floor
-    return (heights > _MIN_OBJECT_HEIGHT) & (heights < _MAX_OBJECT_HEIGHT)
-
-
-def _largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
-    """Return boolean mask keeping only the largest connected cluster in floor 2D space."""
-    coords = _to_floor_2d(pts, u, v)
-    px = to_map_px(coords)
-
-    canvas = np.zeros((_MAP_H, _MAP_W), dtype=np.uint8)
-    valid = (
-        (px[:, 0] >= 0) & (px[:, 0] < _MAP_W) &
-        (px[:, 1] >= 0) & (px[:, 1] < _MAP_H)
-    )
-    canvas[px[valid, 1], px[valid, 0]] = 1
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-    dilated = cv2.dilate(canvas, kernel)
-
-    n_labels, labels = cv2.connectedComponents(dilated)
-    if n_labels <= 1:
-        return valid
-
-    comp_ids = labels[px[valid, 1], px[valid, 0]]
-    counts = np.bincount(comp_ids, minlength=n_labels)
-    counts[0] = 0
-    largest = int(counts.argmax())
-
-    keep = np.zeros(len(pts), dtype=bool)
-    keep[np.where(valid)[0][comp_ids == largest]] = True
-    return keep
-
-
-def _resize_mask_to(mask: np.ndarray, shape: tuple) -> np.ndarray:
-    """Resize a boolean mask to *shape* (H, W) using nearest-neighbour."""
-    h, w = shape[:2]
-    resized = cv2.resize(mask.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
-    return resized.astype(bool)
 
 
 # ── Visualisation helpers ──────────────────────────────────────────────────────
@@ -276,7 +211,7 @@ def _class_surface_overlay(
         return
 
     heights = obj_pts @ n_floor - d_floor
-    above = _filter_above_floor(obj_pts, n_floor, d_floor)
+    above = filter_above_floor(obj_pts, n_floor, d_floor)
     print(f"  [{label}] height filter: {above.sum()} kept / {(~above).sum()} removed  "
           f"(h range {heights.min():.2f}–{heights.max():.2f} m)")
 
@@ -288,7 +223,7 @@ def _class_surface_overlay(
             tilt = float(np.degrees(np.arccos(
                 np.clip(abs(float(np.dot(planes[0].normal, n_floor))), 0.0, 1.0)
             )))
-            if tilt > _MAX_SURFACE_TILT_DEG:
+            if tilt > MAX_SURFACE_TILT_DEG:
                 surface_inliers_local = np.ones(len(filtered), dtype=bool)
                 print(f"  [{label}] RANSAC plane too tilted ({tilt:.1f}°), rejected")
             else:
@@ -308,7 +243,7 @@ def _class_surface_overlay(
 
     surface_pts = obj_pts[surface_mask]
     if len(surface_pts) >= 3:
-        comp_keep = _largest_floor_component(surface_pts, u_vec, v_vec)
+        comp_keep = largest_floor_component(surface_pts, u_vec, v_vec)
         kept_global = np.where(surface_mask)[0][comp_keep]
         component_mask = np.zeros(len(obj_pts), dtype=bool)
         component_mask[kept_global] = True
@@ -402,7 +337,8 @@ def _main():
     _save_mask_vis(frames[0], frame_masks, _DEBUG_DIR / "04_roi_masks.jpg")
 
     target_masks: dict[str, np.ndarray] = {
-        label: _resize_mask_to(mask, depth0.shape)
+        label: cv2.resize(mask.astype(np.uint8), (depth0.shape[1], depth0.shape[0]),
+                          interpolation=cv2.INTER_NEAREST).astype(bool)
         for label, mask in frame_masks.items()
     }
 
@@ -443,7 +379,7 @@ def _main():
     _check_tag_normals(localizer, frames[0], n_floor)
 
     # ── 06 / 07: per-class surface overlay ────────────────────────────────────
-    u_vec, v_vec = _floor_basis(n_floor)
+    u_vec, v_vec = floor_basis(n_floor)
     np.savez(_DEBUG_DIR / "floor_basis.npz", u_vec=u_vec, v_vec=v_vec)
 
     print(f"\n[PER-CLASS SURFACE]")
@@ -455,55 +391,11 @@ def _main():
         )
 
     # ── 08: floor-projected scatter (all frames) ──────────────────────────────
-    depths = [depth0]
-    for frame in frames[1:]:
-        depths.append(depth_processor.process(frame))
-
     camera_height = float(abs(d_floor))
-    surface_heights: dict[str, float] = {}
-
-    class_2d: dict[str, np.ndarray] = {}
-    for canonical, frame_mask in frame_masks.items():
-        pts_list = []
-        for depth in depths:
-            mask = _resize_mask_to(frame_mask, depth.shape)
-            md = depth.copy()
-            md[~mask] = 0.0
-            pts = depth_image_to_point_cloud(md, intrinsics)
-            if len(pts):
-                pts_list.append(pts)
-
-        if not pts_list:
-            print(f"\n[{canonical.upper()}] no depth points in mask")
-            continue
-
-        merged = np.vstack(pts_list)
-        above = _filter_above_floor(merged, n_floor, d_floor)
-        filtered = merged[above]
-        print(f"\n[{canonical.upper()}] {len(filtered)}/{len(merged)} points above floor "
-              f"across {len(pts_list)} frames")
-        if len(filtered) < 10:
-            continue
-
-        planes = detect_planes(filtered, n_planes=1, n_iterations=300,
-                               distance_threshold=0.06)
-        if planes:
-            tilt = float(np.degrees(np.arccos(
-                np.clip(abs(float(np.dot(planes[0].normal, n_floor))), 0.0, 1.0)
-            )))
-            if tilt <= _MAX_SURFACE_TILT_DEG:
-                filtered = filtered[planes[0].inliers]
-                print(f"  Surface RANSAC: {len(filtered)} inliers, tilt={tilt:.1f}°")
-            else:
-                print(f"  RANSAC plane too tilted ({tilt:.1f}°), skipped")
-
-        comp_mask = _largest_floor_component(filtered, u_vec, v_vec)
-        filtered = filtered[comp_mask]
-        print(f"  Largest component: {len(filtered)} points")
-        if len(filtered) >= 3:
-            class_2d[canonical] = _to_floor_2d(filtered, u_vec, v_vec)
-            surface_heights[canonical] = float(np.mean(filtered @ n_floor - d_floor))
-            print(f"  Surface height above floor: {surface_heights[canonical]:.3f} m")
+    depths = [depth0] + [depth_processor.process(f) for f in frames[1:]]
+    class_2d, surface_heights = build_footprints(
+        depths, frame_masks, intrinsics, n_floor, d_floor,
+    )
 
     _save_scatter(class_2d, _DEBUG_DIR / "08_scatter.png")
 
@@ -516,7 +408,7 @@ def _main():
     print("\n[APRIL TAGS ON MAP]")
     for frame in frames:
         for tag, (tx, ty, tz) in localizer.localize_all(frame):
-            pos_2d = _to_floor_2d(np.array([[tx, ty, tz]]), u_vec, v_vec)
+            pos_2d = to_floor_2d(np.array([[tx, ty, tz]]), u_vec, v_vec)
             print(f"  Tag {tag.tag_id}: floor ({pos_2d[0, 0]:.2f}, {pos_2d[0, 1]:.2f}) m")
 
     cv2.imwrite(str(_DEBUG_DIR / "09_stencil_map.png"), stencil)
