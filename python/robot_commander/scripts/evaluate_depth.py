@@ -16,20 +16,20 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from robot_commander.calibration import intrinsics as calibration
 from robot_commander.camera.camera import Camera
 from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 
-_INTRINSICS_PATH = Path(__file__).parents[3] / "intrinsics" / "intrinsics.npz"
 _ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
 
 _MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf"
 
 
 def _load_intrinsics() -> tuple[float, float, float, float]:
-    data = np.load(_INTRINSICS_PATH)
-    K = data["camera_matrix"]
+    intr = calibration.load()
+    K = intr.camera_matrix
     return float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2])
 
 

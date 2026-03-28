@@ -3,31 +3,25 @@ Script to test localization
 """
 
 import cv2
+import numpy as np
 
+from robot_commander.calibration import intrinsics as calibration
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
 from robot_commander.localization.localizer import Localizer
 
+_TAG_SIZE = 0.03  # physical side length of the tag in metres
+
 
 def main():
+    cam_intrinsics = calibration.load()
     detector = TagDetector()
+    localizer = Localizer(detector, cam_intrinsics.camera_matrix, _TAG_SIZE,
+                          dist_coeffs=cam_intrinsics.dist_coeffs)
 
-    warmup_frames = 30
-
-    with Camera(device_index=0) as cam:
-        print(f"Warming up camera ({warmup_frames} frames)...")
-        for _ in range(warmup_frames):
-            cam.read()
-
-        print("Capturing initialization frame...")
-        ok, init_frame = cam.read()
-        if not ok:
-            print("Failed to read initialization frame.")
-            return
-
-        localizer = Localizer(detector, init_frame)
-        print(f"Origin tag center: {localizer._origin.center}")
-        print("Localizer ready. Press 'q' to quit.")
+    with Camera(device_index=0, width=1920, height=1080) as cam:
+        print("Camera opened. Press 'q' to quit.")
+        cam.warm_up()
 
         while True:
             ok, frame = cam.read()
@@ -40,15 +34,18 @@ def main():
 
             pos = localizer.localize(frame)
             if pos is not None:
-                x, y = pos
-                print(f"  x={x:.1f}  y={y:.1f}")
-                cv2.putText(annotated, f"x={x:.1f} y={y:.1f}", (10, 30),
+                x, y, z = pos
+                dist = np.linalg.norm(pos)
+                label = f"x={x:.3f}m  y={y:.3f}m  z={z:.3f}m, dist={dist:.3f}m"
+                print(f"  {label}")
+                cv2.putText(annotated, label, (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
             else:
-                cv2.putText(annotated, "Cannot localize", (10, 30),
+                cv2.putText(annotated, "No tag detected", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-            cv2.imshow("Localization", annotated)
+            display = cv2.resize(annotated, (960, 540))
+            cv2.imshow("Localization", display)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 

@@ -1,42 +1,61 @@
 import cv2
 import numpy as np
 
-from robot_commander.camera.tag_detector import TagDetector, DetectedTag
+from robot_commander.camera.tag_detector import TagDetector
 
 
 class Localizer:
     """
-    Localizes a second tag relative to an origin tag.
+    Estimates the 3-D position of an AprilTag in the camera frame.
 
-    The origin tag is the one with the lowest y center in the initialization frame.
-    Its position is remembered and used to identify it in subsequent frames by proximity.
-    Subsequent calls to localize() return the position of the other tag in the
-    coordinate frame of the origin tag (in pixels).
+    Uses cv2.solvePnP with the four tag corners to recover the translation
+    vector (x, y, z) in metres relative to the camera.
 
     Args:
         detector: A TagDetector instance.
-        init_frame: A frame used to designate the origin tag.
+        camera_matrix: 3×3 intrinsic matrix.
+        tag_size: Physical side length of the tag in metres.
+        dist_coeffs: Distortion coefficients (defaults to zero distortion).
     """
 
-    def __init__(self, detector: TagDetector, init_frame: cv2.typing.MatLike):
-        tags = detector.detect(init_frame)
-        if not tags:
-            raise RuntimeError("No tags found in initialization frame.")
-        self._origin: DetectedTag = min(tags, key=lambda t: t.center[1])
-        self._detector = detector
+    # 3-D object points for the tag corners, at unit scale (multiply by tag_size).
+    # Order must match DetectedTag.corners: top-left, top-right, bottom-right, bottom-left.
+    _UNIT_OBJ_POINTS = np.array([
+        [-0.5, -0.5, 0.0],
+        [ 0.5, -0.5, 0.0],
+        [ 0.5,  0.5, 0.0],
+        [-0.5,  0.5, 0.0],
+    ], dtype=np.float32)
 
-    def localize(self, frame: cv2.typing.MatLike) -> tuple[float, float] | None:
-        """Return (x, y) of the second tag relative to the origin tag, or None."""
+    def __init__(
+        self,
+        detector: TagDetector,
+        camera_matrix: np.ndarray,
+        tag_size: float,
+        dist_coeffs: np.ndarray | None = None,
+    ):
+        self._detector = detector
+        self._camera_matrix = camera_matrix.astype(np.float64)
+        self._dist_coeffs = (
+            dist_coeffs.astype(np.float64)
+            if dist_coeffs is not None
+            else np.zeros(4, dtype=np.float64)
+        )
+        self._obj_points = self._UNIT_OBJ_POINTS * tag_size
+
+    def localize(self, frame: cv2.typing.MatLike) -> tuple[float, float, float] | None:
+        """Return (x, y, z) in metres in the camera frame, or None if no tag found."""
         tags = self._detector.detect(frame)
-        if len(tags) < 2:
+        if not tags:
             return None
 
-        origin = min(
-            tags, key=lambda t: np.linalg.norm(np.array(t.center) - np.array(self._origin.center))
+        tag = tags[0]
+        success, _, tvec = cv2.solvePnP(
+            self._obj_points, tag.corners.astype(np.float32),
+            self._camera_matrix, self._dist_coeffs,
         )
-        others = [t for t in tags if t is not origin]
-        object_to_localize = others[0]  # Assuming one other tag visible
+        if not success:
+            return None
 
-        x = object_to_localize.center[0] - origin.center[0]
-        y = object_to_localize.center[1] - origin.center[1]
-        return x, y
+        x, y, z = tvec.flatten()
+        return float(x), float(y), float(z)
