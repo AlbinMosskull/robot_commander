@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-_DEFAULT_PATH = Path("intrinsics/intrinsics.npz")
+_DEFAULT_PATH = Path("calibration/intrinsics.npz")
 
 
 @dataclass

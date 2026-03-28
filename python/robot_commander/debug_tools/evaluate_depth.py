@@ -1,13 +1,9 @@
 """
 Interactive depth evaluation script
 
-1. First a camera should be initialized and warmed up
-2. Then, a frame should be captured and the user should click 4 points to define a region of interest
-3. Depth should then be captured within this region. (initially using depth anything)
-4. It should then be converted to a point cloud
-5. Then RANSAC should produce a plane fit to this point cloud
-6. Finally, the length and the width of the plane should be printed, and std and max outlier from the plane.
-
+The idea is that the user should select a flat area of known dimensions (e.g. a table),
+for which the script will estimate the dimensions of. The user can then assess the quality
+of the depth.
 """
 
 import json
@@ -21,7 +17,6 @@ from robot_commander.image_processing.camera import Camera
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
-from robot_commander.depth_processing.calibration_ui import capture_calibration_frame
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
@@ -62,7 +57,6 @@ def _draw_roi_overlay(img: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def _ask_keep_roi(frame: np.ndarray, points: np.ndarray) -> bool:
-    """Show the cached ROI polygon. Press Y/Enter to keep, N/Escape to redraw."""
     vis = _draw_roi_overlay(frame, points)
     cv2.putText(vis, "Keep this ROI?  Y = yes   N = redraw",
                 (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
@@ -166,73 +160,25 @@ def plane_dimensions(points: np.ndarray, normal: np.ndarray) -> tuple[float, flo
     return float(extents.max()), float(extents.min())
 
 
-def _show_results(
-    frame: np.ndarray,
-    depth_crop: np.ndarray,
-    roi_points: np.ndarray,
-    mask_crop: np.ndarray,
-    bbox: tuple[int, int, int, int],
-) -> None:
-    x1, y1, x2, y2 = bbox
-
-    # Left panel: RGB crop with polygon overlaid
-    rgb_crop = frame[y1:y2, x1:x2].copy()
-    local_pts = roi_points - np.array([x1, y1], dtype=np.int32)
-    cv2.polylines(rgb_crop, [local_pts.reshape((-1, 1, 2))],
-                  isClosed=True, color=(0, 255, 0), thickness=2)
-
-    # Right panel: depth as a colourmap, masked to ROI
-    depth_display = depth_crop.copy()
-    depth_display[~mask_crop] = 0.0
-    valid_vals = depth_display[mask_crop]
-    if valid_vals.size:
-        d_min, d_max = valid_vals.min(), valid_vals.max()
-        norm = np.zeros_like(depth_display, dtype=np.uint8)
-        if d_max > d_min:
-            norm[mask_crop] = (
-                (depth_display[mask_crop] - d_min) / (d_max - d_min) * 255
-            ).astype(np.uint8)
-        depth_color = cv2.applyColorMap(norm, cv2.COLORMAP_INFERNO)
-        depth_color[~mask_crop] = 0
-    else:
-        depth_color = np.zeros((*depth_crop.shape, 3), dtype=np.uint8)
-
-    # Resize both panels to the same height before hstacking
-    h = max(rgb_crop.shape[0], depth_color.shape[0])
-    def _pad_to_height(img, target_h):
-        pad = target_h - img.shape[0]
-        if pad > 0:
-            img = np.pad(img, ((0, pad), (0, 0), (0, 0)))
-        return img
-
-    panel = np.hstack([_pad_to_height(rgb_crop, h), _pad_to_height(depth_color, h)])
-    cv2.putText(panel, "Selected region", (10, 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-    cv2.putText(panel, "Depth map", (rgb_crop.shape[1] + 10, 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-    cv2.imshow("Results — press any key to exit", panel)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
 def main():
     print("Loading depth model...")
     intrinsics = cal.load()
     detector = TagDetector()
     localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
-    processor = CalibratedDepthProcessor(localizer)
+    processor = CalibratedDepthProcessor()
 
     print("Opening camera...")
     with Camera() as cam:
         print("Warming up camera...")
         cam.warm_up()
+        _, frame = cam.read()
 
-        frame = capture_calibration_frame(cam, processor, detector)
-        if frame is None:
-            print("Cancelled.")
-            return
+    result = processor.calibrate(frame, localizer)
+    if result is None:
+        print("Calibration failed: make sure 2 AprilTags are visible.")
+        return
+    _, depth_full = result
 
     cached = _load_cached_roi()
     if cached is not None and _ask_keep_roi(frame, cached):
@@ -253,8 +199,6 @@ def main():
 
     intrinsics = _load_intrinsics()
 
-    print("Running depth estimation...")
-    depth_full = processor.last_calibrated_depth  # reuse depth computed during calibration
     depth_crop = depth_full[y1:y2, x1:x2].copy()
 
     # Zero out pixels outside the polygon so they are excluded from point cloud

@@ -24,7 +24,7 @@ from robot_commander.image_processing import intrinsics as cal
 from robot_commander.image_processing.camera import Camera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
-from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
+from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor, DepthCalibration
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
@@ -52,9 +52,12 @@ _MAX_SURFACE_TILT_DEG = 40  # reject RANSAC planes tilted more than this from ho
 # ── Calibration (auto) ─────────────────────────────────────────────────────────
 
 def _auto_calibrate(
-    cam: Camera, processor: CalibratedDepthProcessor, detector: TagDetector
-) -> np.ndarray | None:
-    """Silently calibrate as soon as 2 AprilTags are detected. No window shown."""
+    cam: Camera, processor: CalibratedDepthProcessor, detector: TagDetector, localizer: Localizer,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Silently calibrate as soon as 2 AprilTags are detected. No window shown.
+
+    Returns (frame, calibrated_depth) on success, or None if the camera fails.
+    """
     while True:
         ok, frame = cam.read()
         if not ok:
@@ -62,9 +65,12 @@ def _auto_calibrate(
         tags = detector.detect(frame)
         n = len(tags)
         print(f"  {n}/2 tags visible...", end="\r")
-        if n >= 2 and processor.calibrate(frame):
-            print()
-            return frame
+        if n >= 2:
+            result = processor.calibrate(frame, localizer)
+            if result is not None:
+                _, depth = result
+                print()
+                return frame, depth
 
 
 # ── Floor coordinate system ────────────────────────────────────────────────────
@@ -250,17 +256,18 @@ def _main():
     detector = TagDetector()
     localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
-    depth_processor = CalibratedDepthProcessor(localizer)
+    depth_processor = CalibratedDepthProcessor()
     segmentor = SemanticSegmentor()
 
     with Camera() as cam:
         cam.warm_up()
 
         print("Waiting for 2 AprilTags to calibrate...")
-        calib_frame = _auto_calibrate(cam, depth_processor, detector)
-        if calib_frame is None:
+        calib_result = _auto_calibrate(cam, depth_processor, detector, localizer)
+        if calib_result is None:
             print("Cancelled.")
             return
+        calib_frame, calib_depth = calib_result
 
         print(f"Capturing {_NUM_FRAMES} frames for segmentation coverage...")
         frames = [calib_frame]
@@ -279,9 +286,9 @@ def _main():
     for i, frame in enumerate(frames):
         print(f"Processing frame {i + 1}/{len(frames)}...")
 
-        # Depth — reuse cached result for the calibration frame
+        # Depth — reuse the depth map produced during calibration for the first frame
         if i == 0:
-            depth = depth_processor.last_calibrated_depth
+            depth = calib_depth
         else:
             depth = depth_processor.process(frame)
 

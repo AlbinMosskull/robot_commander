@@ -359,7 +359,7 @@ def _main():
     detector_model = TagDetector()
     localizer = Localizer(detector_model, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
-    depth_processor = CalibratedDepthProcessor(localizer)
+    depth_processor = CalibratedDepthProcessor()
 
     print("Loading DETR detection model...")
     detr = ObjectDetector()
@@ -368,10 +368,11 @@ def _main():
 
     with Camera() as cam:
         cam.warm_up()
-        calib_frame = _auto_calibrate(cam, depth_processor, detector_model)
-        if calib_frame is None:
+        calib_result = _auto_calibrate(cam, depth_processor, detector_model, localizer)
+        if calib_result is None:
             print("Cancelled.")
             return
+        calib_frame, depth0 = calib_result
 
         frames = [calib_frame]
         for _ in range(_NUM_FRAMES - 1):
@@ -384,8 +385,6 @@ def _main():
     cv2.imwrite(str(_DEBUG_DIR / "01_frame.jpg"), frames[0])
 
     # ── 02 / 03: depth ────────────────────────────────────────────────────────
-    depth0 = depth_processor.last_calibrated_depth
-    assert depth0 is not None
 
     print(f"\n[SHAPE CHECK]")
     print(f"  frame : {frames[0].shape[:2]}  depth : {depth0.shape}", end="  ")

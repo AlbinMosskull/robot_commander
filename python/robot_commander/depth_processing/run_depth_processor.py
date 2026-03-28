@@ -30,7 +30,7 @@ def main():
                           dist_coeffs=intrinsics.dist_coeffs)
 
     print("Loading Depth Anything V2 model...")
-    processor = CalibratedDepthProcessor(localizer)
+    processor = CalibratedDepthProcessor()
     print("Model loaded. Show 2 AprilTags and press C to calibrate. Press Q to quit.")
 
     with Camera() as cam:
@@ -69,7 +69,7 @@ def main():
             if key == ord('q'):
                 break
             if key in (ord('c'), ord('C')):
-                processor.calibrate(frame)
+                processor.calibrate(frame, localizer)
 
     cv2.destroyAllWindows()
 
