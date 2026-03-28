@@ -1,3 +1,6 @@
+from abc import ABC, abstractmethod
+from pathlib import Path
+
 import cv2
 
 from robot_commander.config import load as load_config
@@ -5,10 +8,27 @@ from robot_commander.config import load as load_config
 _cfg = load_config()
 
 
-class Camera:
+class Camera(ABC):
+    @abstractmethod
+    def read(self) -> tuple[bool, cv2.typing.MatLike]: ...
+
+    def warm_up(self) -> None:
+        pass
+
+    def release(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.release()
+
+
+class WebCamera(Camera):
     """
     Wraps a webcam for frame capture.
-    
+
     Args:
         device_index: The index of the camera to use.
                       Find the index by running `ls /dev/video*` on Linux.
@@ -30,18 +50,24 @@ class Camera:
                     f"Camera does not support resolution {width}x{height}, got {actual_w}x{actual_h}"
                 )
 
-    def warm_up(self):
+    def warm_up(self) -> None:
         for _ in range(10):
             self._cap.read()
 
     def read(self) -> tuple[bool, cv2.typing.MatLike]:
         return self._cap.read()
 
-    def release(self):
+    def release(self) -> None:
         self._cap.release()
 
-    def __enter__(self):
-        return self
 
-    def __exit__(self, *_):
-        self.release()
+class FromFileCamera(Camera):
+    """Serves a single image file as every frame. Useful for testing."""
+
+    def __init__(self, path: str | Path):
+        self._frame = cv2.imread(str(path))
+        if self._frame is None:
+            raise ValueError(f"Could not read image: {path}")
+
+    def read(self) -> tuple[bool, cv2.typing.MatLike]:
+        return True, self._frame.copy()
