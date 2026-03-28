@@ -28,9 +28,6 @@ import time
 from pathlib import Path
 
 import cv2
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
@@ -38,12 +35,18 @@ from robot_commander.image_processing.camera import FromFileCamera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
-from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 from robot_commander.remote_control.map_drawing import draw_stencil_map
 from robot_commander.remote_control.map_geometry import FootprintResult, to_floor_2d, build_footprints
+from robot_commander.remote_control.debug_map_building import (
+    save_depth_vis,
+    save_mask_vis,
+    save_scatter,
+    check_tag_normals,
+    save_surface_vis,
+    debug_floor_plane,
+)
 
 _cfg = load_config()
 _DEBUG_DIR = Path("plots/debug")
@@ -65,139 +68,6 @@ _CLASS_COLORS_BGR = {
 _TARGET_LABELS = set(_OBJECT_CLASSES.values())
 
 
-# ── Visualisation helpers ──────────────────────────────────────────────────────
-
-def _pixel_coords_from_depth(depth: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    dh, dw = depth.shape
-    uu, vv = np.meshgrid(np.arange(dw), np.arange(dh))
-    valid = depth > 0
-    return uu[valid], vv[valid]
-
-
-def _ransac_overlay(
-    frame: np.ndarray,
-    depth: np.ndarray,
-    inlier_mask: np.ndarray,
-    color_inlier: tuple,
-    color_outlier: tuple = (40, 40, 40),
-) -> np.ndarray:
-    fh, fw = frame.shape[:2]
-    dh, dw = depth.shape
-    u_px, v_px = _pixel_coords_from_depth(depth)
-    u_f = (u_px * fw / dw).astype(np.int32).clip(0, fw - 1)
-    v_f = (v_px * fh / dh).astype(np.int32).clip(0, fh - 1)
-    vis = frame.copy()
-    vis[v_f[~inlier_mask], u_f[~inlier_mask]] = color_outlier
-    vis[v_f[inlier_mask],  u_f[inlier_mask]]  = color_inlier
-    return vis
-
-
-def _save_depth_vis(depth: np.ndarray, path: Path) -> np.ndarray:
-    norm = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-    colored = cv2.applyColorMap(norm, cv2.COLORMAP_INFERNO)
-    cv2.imwrite(str(path), colored)
-    return colored
-
-
-def _save_mask_vis(
-    frame: np.ndarray, masks: dict[str, np.ndarray], path: Path
-) -> None:
-    """Save frame with model-predicted masks as coloured overlays."""
-    vis = frame.copy()
-    for label, mask in masks.items():
-        color = _CLASS_COLORS_BGR.get(label, (200, 200, 200))
-        vis[mask] = (vis[mask] * 0.4 + np.array(color) * 0.6).astype(np.uint8)
-        ys, xs = np.where(mask)
-        if len(xs):
-            cx, cy = int(xs.mean()), int(ys.mean())
-            cv2.putText(vis, label, (cx, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-                        np.array(color, dtype=np.uint8).tolist(), 2)
-    cv2.imwrite(str(path), vis)
-
-
-def _save_scatter(class_2d: dict[str, np.ndarray], path: Path) -> None:
-    colors = {"dining table": "tab:red", "couch": "tab:blue"}
-    fig, ax = plt.subplots(figsize=(8, 8))
-    for label, pts in class_2d.items():
-        if not len(pts):
-            continue
-        idx = np.random.choice(len(pts), min(5000, len(pts)), replace=False)
-        ax.scatter(pts[idx, 0], pts[idx, 1], s=1, alpha=0.3,
-                   color=colors.get(label, "gray"), label=label)
-    ax.set_xlabel("right (m)")
-    ax.set_ylabel("forward (m)")
-    ax.set_aspect("equal")
-    ax.legend()
-    ax.set_title("Floor-projected points — camera at origin")
-    ax.axhline(0, color="k", lw=0.5)
-    ax.axvline(0, color="k", lw=0.5)
-    fig.savefig(str(path), dpi=120, bbox_inches="tight")
-    plt.close(fig)
-
-
-# ── AprilTag normal check ──────────────────────────────────────────────────────
-
-def _check_tag_normals(
-    localizer: Localizer, frame: np.ndarray, floor_normal: np.ndarray
-) -> None:
-    tags = localizer._detector.detect(frame)
-    if not tags:
-        print("  No tags detected in calibration frame.")
-        return
-
-    records = []
-    for tag in tags:
-        ok, rvec, tvec = cv2.solvePnP(
-            localizer._obj_points,
-            tag.corners.astype(np.float32),
-            localizer._camera_matrix,
-            localizer._dist_coeffs,
-        )
-        if not ok:
-            continue
-        R, _ = cv2.Rodrigues(rvec)
-        tag_normal = R[:, 2]
-        if np.dot(tag_normal, floor_normal) < 0:
-            tag_normal = -tag_normal
-        angle = float(np.degrees(np.arccos(np.clip(np.dot(tag_normal, floor_normal), -1.0, 1.0))))
-        z = float(tvec.flatten()[2])
-        records.append((z, tag.tag_id, tag_normal, angle))
-        print(f"  Tag {tag.tag_id:3d}: z={z:.3f}m  normal={tag_normal.round(3)}"
-              f"  angle_vs_floor={angle:.2f}°")
-
-    if not records:
-        return
-    records.sort(key=lambda r: r[0], reverse=True)
-    z, tid, tnorm, angle = records[0]
-    print(f"\n  Further tag (ID={tid}, z={z:.3f}m):")
-    print(f"    tag normal   : {tnorm.round(4)}")
-    print(f"    floor normal : {floor_normal.round(4)}")
-    print(f"    angle between: {angle:.2f}°   (0° = tag perfectly flat on floor)")
-    if angle > 15:
-        print("    *** Large angle — tag may not be lying flat, "
-              "or floor RANSAC found the wrong surface ***")
-
-
-# ── Per-class surface overlay ──────────────────────────────────────────────────
-
-def _save_surface_vis(
-    frame: np.ndarray,
-    pts_3d: np.ndarray,
-    intrinsics: cal.Intrinsics,
-    label: str,
-    path: Path,
-) -> None:
-    fh, fw = frame.shape[:2]
-    vis = (frame * 0.25).astype(np.uint8)
-    u = (intrinsics.fx * pts_3d[:, 0] / pts_3d[:, 2] + intrinsics.cx).astype(np.int32).clip(0, fw - 1)
-    v = (intrinsics.fy * pts_3d[:, 1] / pts_3d[:, 2] + intrinsics.cy).astype(np.int32).clip(0, fh - 1)
-    vis[v, u] = (0, 220, 0)
-    cv2.putText(vis, f"{label}: green=final surface", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-    cv2.imwrite(str(path), vis)
-
-
-# ── Main ───────────────────────────────────────────────────────────────────────
-
 def _main():
     _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -207,8 +77,6 @@ def _main():
     localizer = Localizer(detector_model, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor()
-
-    print("Loading DETR + SAM models...")
     segmentor = DetectionSegmentor()
 
     image_path = Path("images/example_input/scene_image.jpg")
@@ -231,8 +99,7 @@ def _main():
     # ── 01: raw frame ─────────────────────────────────────────────────────────
     cv2.imwrite(str(_DEBUG_DIR / "01_frame.jpg"), frames[0])
 
-    # ── 02 / 03: depth ────────────────────────────────────────────────────────
-
+    # ── 02: depth ─────────────────────────────────────────────────────────────
     print(f"\n[SHAPE CHECK]")
     print(f"  frame : {frames[0].shape[:2]}  depth : {depth0.shape}", end="  ")
     if frames[0].shape[:2] != depth0.shape:
@@ -240,8 +107,7 @@ def _main():
     else:
         print("✓ match")
 
-    _save_depth_vis(depth0, _DEBUG_DIR / "02_depth.png")
-
+    save_depth_vis(depth0, _DEBUG_DIR / "02_depth.png")
 
     # ── 04: model-predicted masks ─────────────────────────────────────────────
     print("\nRunning DETR + SAM to detect object masks...")
@@ -251,7 +117,7 @@ def _main():
         if r.label in _TARGET_LABELS
     }
     print(f"  Detected classes: {list(frame_masks.keys())}")
-    _save_mask_vis(frames[0], frame_masks, _DEBUG_DIR / "04_roi_masks.jpg")
+    save_mask_vis(frames[0], frame_masks, _CLASS_COLORS_BGR, _DEBUG_DIR / "04_roi_masks.jpg")
 
     target_masks: dict[str, np.ndarray] = {
         label: cv2.resize(mask.astype(np.uint8), (depth0.shape[1], depth0.shape[0]),
@@ -265,35 +131,13 @@ def _main():
         print(f"  Mask overlap '{labs[0]}' ∩ '{labs[1]}': {overlap} px")
 
     # ── 05: floor RANSAC ──────────────────────────────────────────────────────
-    all_pts0 = depth_image_to_point_cloud(depth0, intrinsics)
-    print(f"\n[POINT CLOUD] {len(all_pts0)} points (frame 0)")
-
-    floor_planes = detect_planes(all_pts0, n_planes=1, n_iterations=500,
-                                 distance_threshold=0.03)
-    if not floor_planes:
-        print("Floor plane not found.")
+    floor = debug_floor_plane(frames[0], depth0, intrinsics, _DEBUG_DIR / "05_floor_ransac.jpg")
+    if floor is None:
         return
-
-    n_floor = floor_planes[0].normal
-    d_floor = floor_planes[0].distance
-    if d_floor > 0:
-        n_floor, d_floor = -n_floor, -d_floor
-
-    print(f"\n[FLOOR PLANE]")
-    print(f"  normal        : {n_floor.round(4)}")
-    print(f"  camera height : {abs(d_floor):.3f} m")
-    tilt = np.degrees(np.arccos(np.clip(abs(n_floor[1]), 0, 1)))
-    print(f"  tilt from cam-Y axis: {tilt:.1f}°")
-    print(f"  inliers       : {floor_planes[0].inliers.sum()} / {len(all_pts0)}")
-
-    floor_overlay = _ransac_overlay(
-        frames[0], depth0, floor_planes[0].inliers,
-        color_inlier=(0, 220, 0), color_outlier=(40, 40, 40),
-    )
-    cv2.imwrite(str(_DEBUG_DIR / "05_floor_ransac.jpg"), floor_overlay)
+    n_floor, d_floor = floor
 
     print(f"\n[APRIL TAG NORMALS vs FLOOR]")
-    _check_tag_normals(localizer, frames[0], n_floor)
+    check_tag_normals(localizer, frames[0], n_floor)
 
     # ── 06 / 07: per-class surface overlay ────────────────────────────────────
     camera_height = float(abs(d_floor))
@@ -304,10 +148,10 @@ def _main():
     print(f"\n[PER-CLASS SURFACE]")
     for canonical, pts_3d in result.label_points.items():
         fname = "06_table_surface.jpg" if "table" in canonical else "07_couch_surface.jpg"
-        _save_surface_vis(frames[0], pts_3d, intrinsics, canonical, _DEBUG_DIR / fname)
+        save_surface_vis(frames[0], pts_3d, intrinsics, canonical, _DEBUG_DIR / fname)
 
     # ── 08: floor-projected scatter (all frames) ──────────────────────────────
-    _save_scatter(result.footprints, _DEBUG_DIR / "08_scatter.png")
+    save_scatter(result.footprints, _DEBUG_DIR / "08_scatter.png")
 
     print(f"\n[SHADOW] camera height: {camera_height:.3f} m  |  surface heights: "
           + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
