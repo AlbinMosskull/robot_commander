@@ -1,6 +1,7 @@
 # Project
 images/
 intrinsics/
+plots/
 
 # Python
 .venv/

@@ -64,5 +64,7 @@ class Localizer:
             )
             if success:
                 x, y, z = tvec.flatten()
+                if z < 0:
+                    x, y, z = -x, -y, -z  # flip the mirrored solvePnP solution
                 results.append((tag, (float(x), float(y), float(z))))
         return results

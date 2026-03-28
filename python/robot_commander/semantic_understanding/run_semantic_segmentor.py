@@ -73,8 +73,10 @@ def main():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2,
                 )
 
-            cv2.imshow("Camera", frame)
-            cv2.imshow("Instances", vis)
+            small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
+            small_vis = cv2.resize(vis, (0, 0), fx=0.5, fy=0.5)
+            cv2.imshow("Camera", small_frame)
+            cv2.imshow("Instances", small_vis)
 
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

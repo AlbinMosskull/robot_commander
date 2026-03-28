@@ -31,10 +31,16 @@ class CalibratedDepthProcessor:
         self._localizer = localizer
         self._scale: float | None = None
         self._offset: float | None = None
+        self._last_calibrated_depth: np.ndarray | None = None
 
     @property
     def is_calibrated(self) -> bool:
         return self._scale is not None
+
+    @property
+    def last_calibrated_depth(self) -> np.ndarray | None:
+        """The calibrated depth map produced during the most recent successful calibrate() call."""
+        return self._last_calibrated_depth
 
     def calibrate(self, frame: np.ndarray) -> bool:
         """
@@ -67,6 +73,10 @@ class CalibratedDepthProcessor:
         self._offset = D1 - self._scale * A1
         print(f"Calibration OK — scale={self._scale:.4f}  offset={self._offset:.4f}  "
               f"(D1={D1:.3f}m A1={A1:.3f})  (D2={D2:.3f}m A2={A2:.3f})")
+
+        calibrated = self._scale * raw + self._offset
+        calibrated[raw == 0] = 0.0
+        self._last_calibrated_depth = calibrated.astype(np.float32)
         return True
 
     def process(self, frame: np.ndarray) -> np.ndarray:

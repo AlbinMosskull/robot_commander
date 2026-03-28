@@ -1,22 +1,19 @@
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
 import torch
 from PIL import Image
 from transformers import pipeline
 
-
-@dataclass
-class SegmentationResult:
-    label: str
-    score: float
-    mask: np.ndarray  # bool (H, W)
+from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
 
 
-class SemanticSegmentor:
+class DetectionSegmentor:
     """
-    Runs Mask2Former instance segmentation on camera frames.
+    Runs object detection on camera frames and exposes results as rectangular masks.
+
+    Uses the HuggingFace object-detection pipeline (default: DETR with ResNet-50).
+    The bounding box for each detected object is converted to a boolean mask so the
+    interface is identical to SemanticSegmentor.
 
     Args:
         model: HuggingFace model ID.
@@ -25,12 +22,12 @@ class SemanticSegmentor:
 
     def __init__(
         self,
-        model: str = "facebook/mask2former-swin-large-coco-instance",
+        model: str = "facebook/detr-resnet-50",
         threshold: float = 0.5,
     ):
         device = 0 if torch.cuda.is_available() else -1
         self._pipe = pipeline(
-            task="image-segmentation",
+            task="object-detection",
             model=model,
             device=device,
         )
@@ -38,22 +35,29 @@ class SemanticSegmentor:
 
     def process(self, frame: np.ndarray) -> list[SegmentationResult]:
         """
-        Run instance segmentation on a single BGR frame from OpenCV.
+        Run object detection on a single BGR frame from OpenCV.
 
         Args:
             frame: BGR image as a numpy array (H, W, 3).
 
         Returns:
-            List of SegmentationResult, one per detected instance, sorted by
-            score descending.
+            List of SegmentationResult with rectangular masks from bounding boxes,
+            sorted by score descending.
         """
+        h, w = frame.shape[:2]
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb)
         raw = self._pipe(pil_image, threshold=self._threshold)
 
         results = []
         for item in raw:
-            mask = np.array(item["mask"], dtype=bool)
+            box = item["box"]
+            mask = np.zeros((h, w), dtype=bool)
+            y1 = max(0, int(box["ymin"]))
+            y2 = min(h, int(box["ymax"]))
+            x1 = max(0, int(box["xmin"]))
+            x2 = min(w, int(box["xmax"]))
+            mask[y1:y2, x1:x2] = True
             results.append(
                 SegmentationResult(
                     label=item["label"],

@@ -18,8 +18,9 @@ import numpy as np
 
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
-from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.camera.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
+from robot_commander.depth_processing.calibration_ui import capture_calibration_frame
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
@@ -216,36 +217,6 @@ def _show_results(
     cv2.destroyAllWindows()
 
 
-def _capture_calibration_frame(
-    cam: Camera, processor: CalibratedDepthProcessor, detector: TagDetector
-) -> np.ndarray | None:
-    """Show live feed until the user presses C to calibrate and capture, or Q to cancel."""
-    window = "Show 2 AprilTags then press C to calibrate — Q to quit"
-    while True:
-        ok, frame = cam.read()
-        if not ok:
-            cv2.destroyWindow(window)
-            return None
-
-        tags = detector.detect(frame)
-        vis = draw_tags(frame, tags)
-        n = len(tags)
-        color = (0, 255, 0) if n >= 2 else (0, 255, 255)
-        cv2.putText(vis, f"{n}/2 tags visible — press C to calibrate",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-        cv2.imshow(window, cv2.resize(vis, (960, 540)))
-
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            cv2.destroyWindow(window)
-            return None
-        if key in (ord('c'), ord('C')):
-            if processor.calibrate(frame):
-                cv2.destroyWindow(window)
-                return frame
-            # calibrate() already printed the failure reason; keep looping
-
-
 def main():
     print("Loading depth model...")
     intrinsics = cal.load()
@@ -259,7 +230,7 @@ def main():
         print("Warming up camera...")
         cam.warm_up()
 
-        frame = _capture_calibration_frame(cam, processor, detector)
+        frame = capture_calibration_frame(cam, processor, detector)
         if frame is None:
             print("Cancelled.")
             return
@@ -284,7 +255,7 @@ def main():
     fx, fy, cx, cy = _load_intrinsics()
 
     print("Running depth estimation...")
-    depth_full = processor.process(frame)
+    depth_full = processor.last_calibrated_depth  # reuse depth computed during calibration
     depth_crop = depth_full[y1:y2, x1:x2].copy()
 
     # Zero out pixels outside the polygon so they are excluded from point cloud
