@@ -16,7 +16,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander.calibration import intrinsics as calibration
+from robot_commander.camera import intrinsics as calibration
 from robot_commander.camera.camera import Camera
 from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud

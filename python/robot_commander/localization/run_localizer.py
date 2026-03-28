@@ -5,7 +5,7 @@ Script to test localization
 import cv2
 import numpy as np
 
-from robot_commander.calibration import intrinsics as calibration
+from robot_commander.camera import intrinsics as calibration
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
 from robot_commander.localization.localizer import Localizer
