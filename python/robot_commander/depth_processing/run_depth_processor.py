@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.image_processing.tag_detector import TagDetector, draw_tags
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
@@ -33,7 +33,7 @@ def main():
     processor = CalibratedDepthProcessor()
     print("Model loaded. Show 2 AprilTags and press C to calibrate. Press Q to quit.")
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         cam.warm_up()
 
         while True:

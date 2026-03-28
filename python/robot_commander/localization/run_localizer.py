@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as calibration
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.image_processing.tag_detector import TagDetector, draw_tags
 from robot_commander.config import load as load_config
 from robot_commander.localization.localizer import Localizer
@@ -21,7 +21,7 @@ def main():
     localizer = Localizer(detector, cam_intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=cam_intrinsics.dist_coeffs)
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         print("Camera opened. Press 'q' to quit.")
         cam.warm_up()
 

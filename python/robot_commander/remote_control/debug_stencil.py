@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
@@ -366,7 +366,7 @@ def _main():
     print("Loading SAM model...")
     sam = SamSegmentor()
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         cam.warm_up()
         calib_result = _auto_calibrate(cam, depth_processor, detector_model, localizer)
         if calib_result is None:

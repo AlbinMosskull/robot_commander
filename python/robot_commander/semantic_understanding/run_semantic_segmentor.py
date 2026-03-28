@@ -5,7 +5,7 @@ Script to visualise instance segmentation on live camera frames.
 import cv2
 import numpy as np
 
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.semantic_understanding.semantic_segmentor import (
     SemanticSegmentor,
     SegmentationResult,
@@ -53,7 +53,7 @@ def main():
     segmentor = SemanticSegmentor()
     print(f"Model loaded. Press 'q' to quit.")
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         while True:
             ok, frame = cam.read()
             if not ok:

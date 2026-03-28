@@ -14,7 +14,7 @@ from pathlib import Path
 
 import cv2
 
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.config import load as load_config
 
 SAVE_DIR = Path("images/captured_images")
@@ -24,7 +24,7 @@ _cfg = load_config()
 def main():
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         print("Camera opened.")
         print("  SPACE       - capture frame")
         print("  y / ENTER   - approve and save")

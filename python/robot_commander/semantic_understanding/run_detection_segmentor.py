@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from robot_commander.image_processing.camera import WebCamera as Camera
+from robot_commander.image_processing.camera import WebCamera
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 from robot_commander.semantic_understanding.types import SegmentationResult
 
@@ -50,7 +50,7 @@ def main():
     segmentor = DetectionSegmentor()
     print("Models loaded. Press 'q' to quit.")
 
-    with Camera() as cam:
+    with WebCamera() as cam:
         while True:
             ok, frame = cam.read()
             if not ok:
