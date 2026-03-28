@@ -10,7 +10,7 @@ class Camera:
                       Find the index by running `ls /dev/video*` on Linux.
     """
 
-    def __init__(self, device_index: int = 0, width: int | None = None, height: int | None = None):
+    def __init__(self, device_index: int = 0, width: int | None = 1920, height: int | None = 1080):
         self._cap = cv2.VideoCapture(device_index)
         if not self._cap.isOpened():
             raise RuntimeError(f"Could not open camera at device index {device_index}")

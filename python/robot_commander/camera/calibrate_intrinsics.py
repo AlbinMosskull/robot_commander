@@ -104,32 +104,32 @@ def main() -> None:
     parser.add_argument(
         "--images",
         type=Path,
-        default=Path("captured_images"),
-        help="Directory containing calibration images (default: captured_images/)",
+        default=Path("images/captured_images"),
+        help="Directory containing calibration images",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("intrinsics.npz"),
-        help="Output path for the .npz file (default: intrinsics.npz)",
+        help="Output path for the .npz file",
     )
     parser.add_argument(
         "--cols",
         type=int,
         default=CHECKERBOARD[0],
-        help=f"Inner corner columns on the checkerboard (default: {CHECKERBOARD[0]})",
+        help=f"Inner corner columns on the checkerboard",
     )
     parser.add_argument(
         "--rows",
         type=int,
         default=CHECKERBOARD[1],
-        help=f"Inner corner rows on the checkerboard (default: {CHECKERBOARD[1]})",
+        help=f"Inner corner rows on the checkerboard",
     )
     parser.add_argument(
         "--square-size",
         type=float,
         default=SQUARE_SIZE_M,
-        help=f"Physical square side length in metres (default: {SQUARE_SIZE_M})",
+        help=f"Physical square side length in metres",
     )
     args = parser.parse_args()
 
