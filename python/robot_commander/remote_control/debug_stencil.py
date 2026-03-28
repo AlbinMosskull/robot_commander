@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.image_processing.camera import Camera, FromFileCamera
+from robot_commander.image_processing.camera import FromFileCamera
 from robot_commander.config import load as load_config
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
@@ -43,6 +43,9 @@ from robot_commander.depth_processing.point_cloud import depth_image_to_point_cl
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
+from robot_commander.remote_control.map_drawing import (
+    _MAP_W, _MAP_H, draw_stencil_map, to_map_px,
+)
 
 _cfg = load_config()
 _DEBUG_DIR = Path("plots/debug")
@@ -54,9 +57,6 @@ _OBJECT_CLASSES: dict[str, str] = {
 }
 _NUM_FRAMES = 5
 _FRAME_INTERVAL_S = 0.3
-_MAP_SCALE = 150
-_MAP_W, _MAP_H = 600, 600
-_MAP_ORIGIN = (300, 540)
 _MIN_OBJECT_HEIGHT = 0.10
 _MAX_OBJECT_HEIGHT = 1.50
 _MAX_SURFACE_TILT_DEG = 40
@@ -68,30 +68,6 @@ _CLASS_COLORS_BGR = {
 }
 
 _TARGET_LABELS = set(_OBJECT_CLASSES.values())
-
-
-# ── Calibration ────────────────────────────────────────────────────────────────
-
-def _auto_calibrate(
-    cam: Camera, processor: CalibratedDepthProcessor, detector: TagDetector, localizer: Localizer,
-) -> tuple[np.ndarray, np.ndarray] | None:
-    """Silently calibrate as soon as 2 AprilTags are detected. No window shown.
-
-    Returns (frame, calibrated_depth) on success, or None if the camera fails.
-    """
-    while True:
-        ok, frame = cam.read()
-        if not ok:
-            return None
-        tags = detector.detect(frame)
-        n = len(tags)
-        print(f"  {n}/2 tags visible...", end="\r")
-        if n >= 2:
-            result = processor.calibrate(frame, localizer)
-            if result is not None:
-                _, depth = result
-                print()
-                return frame, depth
 
 
 # ── Floor coordinate system ────────────────────────────────────────────────────
@@ -125,7 +101,7 @@ def _filter_above_floor(
 def _largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
     """Return boolean mask keeping only the largest connected cluster in floor 2D space."""
     coords = _to_floor_2d(pts, u, v)
-    px = _to_map_px(coords)
+    px = to_map_px(coords)
 
     canvas = np.zeros((_MAP_H, _MAP_W), dtype=np.uint8)
     valid = (
@@ -149,94 +125,6 @@ def _largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> n
     keep = np.zeros(len(pts), dtype=bool)
     keep[np.where(valid)[0][comp_ids == largest]] = True
     return keep
-
-
-def _to_map_px(coords_2d: np.ndarray) -> np.ndarray:
-    ox, oy = _MAP_ORIGIN
-    return np.column_stack([
-        (ox + coords_2d[:, 0] * _MAP_SCALE).astype(np.int32),
-        (oy - coords_2d[:, 1] * _MAP_SCALE).astype(np.int32),
-    ])
-
-
-# ── Stencil map drawing ────────────────────────────────────────────────────────
-
-def _table_shadow_polygon(
-    contour: np.ndarray,
-    camera_height: float,
-    table_height: float,
-) -> np.ndarray:
-    s = camera_height / (camera_height - table_height)
-    ox, oy = _MAP_ORIGIN
-    pts = contour[:, 0, :].astype(float)
-    shadow = np.column_stack([
-        ox + s * (pts[:, 0] - ox),
-        oy + s * (pts[:, 1] - oy),
-    ]).astype(np.int32)
-    return shadow.reshape(-1, 1, 2)
-
-
-def _draw_camera_symbol(canvas: np.ndarray, intr: cal.Intrinsics) -> None:
-    near_z, far_z = 0.05, 0.2
-    near_hw = near_z * intr.cx / intr.fx
-    far_hw  = far_z  * intr.cx / intr.fx
-    pts_2d = np.array([
-        (-near_hw, near_z), (near_hw, near_z),
-        ( far_hw,  far_z),  (-far_hw, far_z),
-    ], dtype=np.float32)
-    px = _to_map_px(pts_2d).reshape(-1, 1, 2)
-    cv2.polylines(canvas, [px], isClosed=True, color=(180, 60, 0), thickness=2)
-    ox, oy = _MAP_ORIGIN
-    cv2.putText(canvas, "Camera", (ox + 12, oy + 20),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 60, 0), 1)
-
-
-def _draw_stencil_map(
-    footprints: dict[str, np.ndarray],
-    intr: cal.Intrinsics,
-    camera_height: float | None = None,
-    surface_heights: dict[str, float] | None = None,
-) -> np.ndarray:
-    canvas = np.full((_MAP_H, _MAP_W, 3), 255, dtype=np.uint8)
-    close_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31))
-
-    smoothed: list[tuple[str, list]] = []
-    for label, coords_2d in footprints.items():
-        px = _to_map_px(coords_2d)
-        valid = (
-            (px[:, 0] >= 0) & (px[:, 0] < _MAP_W) &
-            (px[:, 1] >= 0) & (px[:, 1] < _MAP_H)
-        )
-        if valid.sum() < 3:
-            continue
-        cell = np.zeros((_MAP_H, _MAP_W), dtype=np.uint8)
-        cell[px[valid, 1], px[valid, 0]] = 1
-        cell = cv2.morphologyEx(cell, cv2.MORPH_CLOSE, close_kernel)
-        contours, _ = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            smoothed.append((label, contours))
-
-    if camera_height is not None and surface_heights is not None:
-        for label, contours in smoothed:
-            if label not in surface_heights:
-                continue
-            h_surface = surface_heights[label]
-            if camera_height <= h_surface:
-                continue
-            largest = max(contours, key=cv2.contourArea)
-            shadow = _table_shadow_polygon(largest, camera_height, h_surface)
-            cv2.fillPoly(canvas, [shadow], (210, 210, 225))
-
-    for label, contours in smoothed:
-        cv2.drawContours(canvas, contours, -1, color=(0, 0, 0), thickness=2)
-        largest = max(contours, key=cv2.contourArea)
-        lx = int(largest[:, 0, 0].mean())
-        ly = int(largest[:, 0, 1].min()) - 8
-        cv2.putText(canvas, label.capitalize(), (lx, ly),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
-
-    _draw_camera_symbol(canvas, intr)
-    return canvas
 
 
 def _resize_mask_to(mask: np.ndarray, shape: tuple) -> np.ndarray:
@@ -471,13 +359,14 @@ def _main():
     image_path = Path("images/example_input/scene_image.jpg")
     with FromFileCamera(image_path) as cam:
         cam.warm_up()
-        calib_result = _auto_calibrate(cam, depth_processor, detector_model, localizer)
+        _, frame0 = cam.read()
+        calib_result = depth_processor.calibrate(frame0, localizer)
         if calib_result is None:
-            print("Cancelled.")
+            print("Calibration failed — ensure 2 AprilTags are visible.")
             return
-        calib_frame, depth0 = calib_result
+        _, depth0 = calib_result
 
-        frames = [calib_frame]
+        frames = [frame0]
         for _ in range(_NUM_FRAMES - 1):
             time.sleep(_FRAME_INTERVAL_S)
             ok, f = cam.read()
@@ -622,14 +511,12 @@ def _main():
           + ", ".join(f"{k}: {v:.3f} m" for k, v in surface_heights.items()))
 
     # ── 09: stencil map ───────────────────────────────────────────────────────
-    stencil = _draw_stencil_map(class_2d, intrinsics, camera_height, surface_heights)
+    stencil = draw_stencil_map(class_2d, intrinsics, camera_height, surface_heights)
 
     print("\n[APRIL TAGS ON MAP]")
     for frame in frames:
         for tag, (tx, ty, tz) in localizer.localize_all(frame):
             pos_2d = _to_floor_2d(np.array([[tx, ty, tz]]), u_vec, v_vec)
-            px = _to_map_px(pos_2d)[0]
-            pt = (int(px[0]), int(px[1]))
             print(f"  Tag {tag.tag_id}: floor ({pos_2d[0, 0]:.2f}, {pos_2d[0, 1]:.2f}) m")
 
     cv2.imwrite(str(_DEBUG_DIR / "09_stencil_map.png"), stencil)
