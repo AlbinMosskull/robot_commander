@@ -78,4 +78,6 @@ class CalibratedDepthProcessor:
         if not self.is_calibrated:
             raise RuntimeError("Call calibrate() before process().")
         raw = self._base.process(frame)
-        return (self._scale * raw + self._offset).astype(np.float32)
+        calibrated = self._scale * raw + self._offset
+        calibrated[raw == 0] = 0.0  # preserve invalid pixels
+        return calibrated.astype(np.float32)
