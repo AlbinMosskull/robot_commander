@@ -57,4 +57,4 @@ def test_localize_uses_first_detected_tag():
     tvec = np.array([[0.0], [0.0], [1.0]])
     with patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)) as mock_pnp:
         localizer.localize(_BLANK_FRAME)
-    np.testing.assert_array_equal(mock_pnp.call_args[0][1], tag_a.corners)
+    np.testing.assert_array_equal(mock_pnp.call_args_list[0][0][1], tag_a.corners)
