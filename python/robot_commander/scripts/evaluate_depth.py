@@ -2,13 +2,16 @@
 Interactive depth evaluation script
 
 1. First a camera should be initialized and warmed up
-2. Then, a frame should be captured and the user should be allowed to draw a bounding box on it
+2. Then, a frame should be captured and the user should click 4 points to define a region of interest
 3. Depth should then be captured within this region. (initially using depth anything)
 4. It should then be converted to a point cloud
 5. Then RANSAC should produce a plane fit to this point cloud
 6. Finally, the length and the width of the plane should be printed, and std and max outlier from the plane.
 
 """
+
+import json
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -18,85 +21,202 @@ from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
 
-# Approximate intrinsics for a typical webcam at 640x360.
-# Replace with calibrated values for better accuracy.
-FX = 500.0
-FY = 500.0
+_INTRINSICS_PATH = Path(__file__).parents[3] / "intrinsics" / "intrinsics.npz"
+_ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
+
+_MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf"
 
 
-def draw_bounding_box(frame: np.ndarray) -> tuple[int, int, int, int] | None:
-    """Show the frame and let the user drag a bounding box with the mouse.
+def _load_intrinsics() -> tuple[float, float, float, float]:
+    data = np.load(_INTRINSICS_PATH)
+    K = data["camera_matrix"]
+    return float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2])
+
+
+def _load_cached_roi() -> np.ndarray | None:
+    """Returns (4, 2) int32 array of points, or None."""
+    if not _ROI_CACHE_PATH.exists():
+        return None
+    try:
+        d = json.loads(_ROI_CACHE_PATH.read_text())
+        pts = np.array(d["points"], dtype=np.int32)
+        if pts.shape == (4, 2):
+            return pts
+        return None
+    except Exception:
+        return None
+
+
+def _save_roi(points: np.ndarray) -> None:
+    _ROI_CACHE_PATH.write_text(json.dumps({"points": points.tolist()}))
+
+
+def _draw_roi_overlay(img: np.ndarray, points: np.ndarray) -> np.ndarray:
+    vis = img.copy()
+    cv2.polylines(vis, [points.reshape((-1, 1, 2))], isClosed=True, color=(0, 255, 0), thickness=2)
+    for pt in points:
+        cv2.circle(vis, tuple(pt), 6, (0, 255, 0), -1)
+    return vis
+
+
+def _ask_keep_roi(frame: np.ndarray, points: np.ndarray) -> bool:
+    """Show the cached ROI polygon. Press Y/Enter to keep, N/Escape to redraw."""
+    vis = _draw_roi_overlay(frame, points)
+    cv2.putText(vis, "Keep this ROI?  Y = yes   N = redraw",
+                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    cv2.imshow("Cached ROI", vis)
+    while True:
+        key = cv2.waitKey(0) & 0xFF
+        if key in (ord('y'), ord('Y'), 13):   # Y or Enter
+            cv2.destroyWindow("Cached ROI")
+            return True
+        if key in (ord('n'), ord('N'), 27):   # N or Escape
+            cv2.destroyWindow("Cached ROI")
+            return False
+
+
+def select_four_points(frame: np.ndarray) -> np.ndarray | None:
+    """Show the frame and let the user click 4 points to define a ROI polygon.
+
+    Left-click to place each point in order. The polygon closes automatically
+    after the 4th click. Press Escape at any time to cancel.
 
     Returns:
-        (x1, y1, x2, y2) in pixel coordinates, or None if the user cancelled.
+        (4, 2) int32 array of (x, y) points, or None if cancelled.
     """
-    box: list[tuple[int, int]] = []
-    drawing = False
-    current: list[tuple[int, int]] = [(-1, -1)]
-    done = False
+    vis = frame.copy()
+    points: list[tuple[int, int]] = []
+    window_name = "Click 4 points to define ROI  (Escape = cancel)"
+    done = [False]
 
-    clone = frame.copy()
-    window = "Draw bounding box — drag to select, Enter to confirm, Esc to cancel"
+    def mouse_callback(event, x, y, _flags, _param):
+        if event != cv2.EVENT_LBUTTONDOWN or len(points) >= 4:
+            return
 
-    def on_mouse(event, x, y, *_):
-        nonlocal drawing, done
-        if event == cv2.EVENT_LBUTTONDOWN:
-            box.clear()
-            box.append((x, y))
-            drawing = True
-        elif event == cv2.EVENT_MOUSEMOVE and drawing:
-            current[0] = (x, y)
-        elif event == cv2.EVENT_LBUTTONUP:
-            box.append((x, y))
-            drawing = False
+        points.append((x, y))
+        n = len(points)
 
-    cv2.namedWindow(window)
-    cv2.setMouseCallback(window, on_mouse)
+        cv2.circle(vis, (x, y), 6, (0, 255, 0), -1)
+        cv2.putText(vis, str(n), (x + 8, y - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        if n > 1:
+            cv2.line(vis, points[-2], points[-1], (0, 255, 0), 2)
+        if n == 4:
+            cv2.line(vis, points[-1], points[0], (0, 255, 0), 2)
+            cv2.putText(vis, "Done — press any key to continue",
+                        (10, vis.shape[0] - 15), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7, (0, 255, 255), 2)
+            done[0] = True
+
+        cv2.imshow(window_name, vis)
+
+    cv2.namedWindow(window_name)
+    cv2.setMouseCallback(window_name, mouse_callback)
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
 
     while True:
-        img = clone.copy()
-        if len(box) >= 1 and current[0] != (-1, -1) and drawing:
-            cv2.rectangle(img, box[0], current[0], (0, 255, 0), 2)
-        elif len(box) == 2:
-            cv2.rectangle(img, box[0], box[1], (0, 255, 0), 2)
-        cv2.imshow(window, img)
-        key = cv2.waitKey(16) & 0xFF
-        if key == 13 and len(box) == 2:  # Enter
-            break
-        if key == 27:  # Esc
-            cv2.destroyWindow(window)
-            return None
+        display = vis.copy()
+        remaining = 4 - len(points)
+        if remaining > 0:
+            label = f"Click point {len(points) + 1} of 4"
+            cv2.putText(display, label, (10, 30), font, 0.8, (0, 255, 255), 2)
+        cv2.imshow(window_name, display)
 
-    cv2.destroyWindow(window)
-    x1 = min(box[0][0], box[1][0])
-    y1 = min(box[0][1], box[1][1])
-    x2 = max(box[0][0], box[1][0])
-    y2 = max(box[0][1], box[1][1])
-    return x1, y1, x2, y2
+        key = cv2.waitKey(20) & 0xFF
+        if key == 27:   # Escape — cancel
+            cv2.destroyWindow(window_name)
+            return None
+        if done[0]:
+            cv2.waitKey(400)   # brief pause so user sees the closed polygon
+            break
+
+    cv2.destroyWindow(window_name)
+    return np.array(points, dtype=np.int32)
+
+
+def _roi_mask_and_bbox(
+    points: np.ndarray, frame_shape: tuple
+) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    """Return a boolean mask (H, W) for the polygon and its axis-aligned bounding box."""
+    x1, y1 = points.min(axis=0)
+    x2, y2 = points.max(axis=0)
+
+    full_mask = np.zeros(frame_shape[:2], dtype=np.uint8)
+    cv2.fillPoly(full_mask, [points.reshape((-1, 1, 2))], 1)
+    mask_crop = full_mask[y1:y2, x1:x2].astype(bool)
+    return mask_crop, (int(x1), int(y1), int(x2), int(y2))
 
 
 def plane_dimensions(points: np.ndarray, normal: np.ndarray) -> tuple[float, float]:
-    """Compute the length and width of a set of (inlier) points on a plane.
-
-    Projects points onto the plane and returns the extents along the two
-    principal axes found by PCA.
+    """Compute length and width of inlier points projected onto the plane.
 
     Returns:
         (length, width) where length >= width.
     """
     centroid = points.mean(axis=0)
     centered = points - centroid
-    # Remove normal component to get in-plane coordinates
     in_plane = centered - (centered @ normal)[:, None] * normal
     _, _, vh = np.linalg.svd(in_plane, full_matrices=False)
-    coords = in_plane @ vh[:2].T  # (N, 2) — projection onto two principal axes
+    coords = in_plane @ vh[:2].T
     extents = coords.max(axis=0) - coords.min(axis=0)
     return float(extents.max()), float(extents.min())
 
 
+def _show_results(
+    frame: np.ndarray,
+    depth_crop: np.ndarray,
+    roi_points: np.ndarray,
+    mask_crop: np.ndarray,
+    bbox: tuple[int, int, int, int],
+) -> None:
+    x1, y1, x2, y2 = bbox
+
+    # Left panel: RGB crop with polygon overlaid
+    rgb_crop = frame[y1:y2, x1:x2].copy()
+    local_pts = roi_points - np.array([x1, y1], dtype=np.int32)
+    cv2.polylines(rgb_crop, [local_pts.reshape((-1, 1, 2))],
+                  isClosed=True, color=(0, 255, 0), thickness=2)
+
+    # Right panel: depth as a colourmap, masked to ROI
+    depth_display = depth_crop.copy()
+    depth_display[~mask_crop] = 0.0
+    valid_vals = depth_display[mask_crop]
+    if valid_vals.size:
+        d_min, d_max = valid_vals.min(), valid_vals.max()
+        norm = np.zeros_like(depth_display, dtype=np.uint8)
+        if d_max > d_min:
+            norm[mask_crop] = (
+                (depth_display[mask_crop] - d_min) / (d_max - d_min) * 255
+            ).astype(np.uint8)
+        depth_color = cv2.applyColorMap(norm, cv2.COLORMAP_INFERNO)
+        depth_color[~mask_crop] = 0
+    else:
+        depth_color = np.zeros((*depth_crop.shape, 3), dtype=np.uint8)
+
+    # Resize both panels to the same height before hstacking
+    h = max(rgb_crop.shape[0], depth_color.shape[0])
+    def _pad_to_height(img, target_h):
+        pad = target_h - img.shape[0]
+        if pad > 0:
+            img = np.pad(img, ((0, pad), (0, 0), (0, 0)))
+        return img
+
+    panel = np.hstack([_pad_to_height(rgb_crop, h), _pad_to_height(depth_color, h)])
+    cv2.putText(panel, "Selected region", (10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+    cv2.putText(panel, "Depth map", (rgb_crop.shape[1] + 10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+
+    cv2.imshow("Results — press any key to exit", panel)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
 def main():
     print("Loading depth model...")
-    processor = DepthProcessor("depth-anything/Depth-Anything-V2-Metric-Indoor-Small-hf")
+    processor = DepthProcessor(_MODEL)
 
     print("Opening camera...")
     with Camera(0) as cam:
@@ -107,30 +227,37 @@ def main():
         if not ret:
             raise RuntimeError("Failed to capture frame from camera")
 
-    print("Draw a bounding box over the region of interest.")
-    bbox = draw_bounding_box(frame)
-    if bbox is None:
-        print("Cancelled.")
-        return
+    cached = _load_cached_roi()
+    if cached is not None and _ask_keep_roi(frame, cached):
+        roi_points = cached
+    else:
+        while True:
+            print("Click 4 points on the frame to define the region of interest.")
+            roi_points = select_four_points(frame)
+            if roi_points is None:
+                print("Cancelled.")
+                return
+            if _ask_keep_roi(frame, roi_points):
+                break
+        _save_roi(roi_points)
 
-    x1, y1, x2, y2 = bbox
-    print(f"Selected region: ({x1}, {y1}) → ({x2}, {y2})")
+    mask_crop, (x1, y1, x2, y2) = _roi_mask_and_bbox(roi_points, frame.shape)
+    print(f"Selected ROI bounding box: ({x1}, {y1}) → ({x2}, {y2})")
 
-    cropped = frame[y1:y2, x1:x2]
-    h, w = frame.shape[:2]
-    cx = w / 2.0
-    cy = h / 2.0
+    fx, fy, cx, cy = _load_intrinsics()
 
     print("Running depth estimation...")
     depth_full = processor.process(frame)
-    depth_crop = depth_full[y1:y2, x1:x2]
+    depth_crop = depth_full[y1:y2, x1:x2].copy()
 
-    # Adjust principal point for the cropped region.
+    # Zero out pixels outside the polygon so they are excluded from point cloud
+    depth_crop[~mask_crop] = 0.0
+
     cx_crop = cx - x1
     cy_crop = cy - y1
 
     print("Building point cloud...")
-    points = depth_image_to_point_cloud(depth_crop, FX, FY, cx_crop, cy_crop)
+    points = depth_image_to_point_cloud(depth_crop, fx, fy, cx_crop, cy_crop)
 
     if len(points) < 10:
         print("Not enough valid depth points in the selected region.")
@@ -155,15 +282,6 @@ def main():
     print(f"Width:         {width:.3f} m")
     print(f"Std dev:       {distances.std():.4f} m")
     print(f"Max outlier:   {distances.max():.4f} m")
-
-    # Visualise the selected region with depth overlay
-    depth_vis = cv2.normalize(depth_crop, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-    depth_color = cv2.applyColorMap(depth_vis, cv2.COLORMAP_INFERNO)
-    combined = np.hstack([cropped, depth_color])
-    cv2.imshow("Region | Depth", combined)
-    print("\nPress any key to exit.")
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
