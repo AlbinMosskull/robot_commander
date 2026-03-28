@@ -16,19 +16,21 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander.camera import intrinsics as calibration
+from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
-from robot_commander.depth_processing.depth_processor import DepthProcessor
+from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes
+from robot_commander.localization.localizer import Localizer
 
 _ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
 
-_MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf"
+_TAG_SIZE = 0.03  # physical side length of the AprilTags in metres
 
 
 def _load_intrinsics() -> tuple[float, float, float, float]:
-    intr = calibration.load()
+    intr = cal.load()
     K = intr.camera_matrix
     return float(K[0, 0]), float(K[1, 1]), float(K[0, 2]), float(K[1, 2])
 
@@ -214,18 +216,53 @@ def _show_results(
     cv2.destroyAllWindows()
 
 
+def _capture_calibration_frame(
+    cam: Camera, processor: CalibratedDepthProcessor, detector: TagDetector
+) -> np.ndarray | None:
+    """Show live feed until the user presses C to calibrate and capture, or Q to cancel."""
+    window = "Show 2 AprilTags then press C to calibrate — Q to quit"
+    while True:
+        ok, frame = cam.read()
+        if not ok:
+            cv2.destroyWindow(window)
+            return None
+
+        tags = detector.detect(frame)
+        vis = draw_tags(frame, tags)
+        n = len(tags)
+        color = (0, 255, 0) if n >= 2 else (0, 255, 255)
+        cv2.putText(vis, f"{n}/2 tags visible — press C to calibrate",
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        cv2.imshow(window, cv2.resize(vis, (960, 540)))
+
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            cv2.destroyWindow(window)
+            return None
+        if key in (ord('c'), ord('C')):
+            if processor.calibrate(frame):
+                cv2.destroyWindow(window)
+                return frame
+            # calibrate() already printed the failure reason; keep looping
+
+
 def main():
     print("Loading depth model...")
-    processor = DepthProcessor(_MODEL)
+    intrinsics = cal.load()
+    detector = TagDetector()
+    localizer = Localizer(detector, intrinsics.camera_matrix, _TAG_SIZE,
+                          dist_coeffs=intrinsics.dist_coeffs)
+    processor = CalibratedDepthProcessor(localizer)
 
     print("Opening camera...")
     with Camera(0) as cam:
         print("Warming up camera...")
         cam.warm_up()
 
-        ret, frame = cam.read()
-        if not ret:
-            raise RuntimeError("Failed to capture frame from camera")
+        frame = _capture_calibration_frame(cam, processor, detector)
+        if frame is None:
+            print("Cancelled.")
+            return
 
     cached = _load_cached_roi()
     if cached is not None and _ask_keep_roi(frame, cached):

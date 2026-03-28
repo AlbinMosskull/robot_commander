@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from robot_commander.camera.tag_detector import TagDetector
+from robot_commander.camera.tag_detector import DetectedTag, TagDetector
 
 
 class Localizer:
@@ -45,17 +45,24 @@ class Localizer:
 
     def localize(self, frame: cv2.typing.MatLike) -> tuple[float, float, float] | None:
         """Return (x, y, z) in metres in the camera frame, or None if no tag found."""
+        results = self.localize_all(frame)
+        if not results:
+            return None
+        _, pos = results[0]
+        return pos
+
+    def localize_all(
+        self, frame: cv2.typing.MatLike
+    ) -> list[tuple[DetectedTag, tuple[float, float, float]]]:
+        """Return (tag, (x, y, z)) for every detected tag that solvePnP succeeds on."""
         tags = self._detector.detect(frame)
-        if not tags:
-            return None
-
-        tag = tags[0]
-        success, _, tvec = cv2.solvePnP(
-            self._obj_points, tag.corners.astype(np.float32),
-            self._camera_matrix, self._dist_coeffs,
-        )
-        if not success:
-            return None
-
-        x, y, z = tvec.flatten()
-        return float(x), float(y), float(z)
+        results = []
+        for tag in tags:
+            success, _, tvec = cv2.solvePnP(
+                self._obj_points, tag.corners.astype(np.float32),
+                self._camera_matrix, self._dist_coeffs,
+            )
+            if success:
+                x, y, z = tvec.flatten()
+                results.append((tag, (float(x), float(y), float(z))))
+        return results
