@@ -2,6 +2,8 @@
 This module is responsible for the geometric processing of building the stencil map.
 """
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
 
@@ -12,10 +14,19 @@ from robot_commander.remote_control.map_drawing import _MAP_H, _MAP_W, to_map_px
 
 _MIN_OBJECT_HEIGHT = 0.10
 _MAX_OBJECT_HEIGHT = 1.50
-MAX_SURFACE_TILT_DEG = 40
+_MAX_SURFACE_TILT_DEG = 40
 
 
-def floor_basis(normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+@dataclass
+class FootprintResult:
+    footprints: dict[str, np.ndarray]
+    surface_heights: dict[str, float]
+    u_floor: np.ndarray
+    v_floor: np.ndarray
+    label_points: dict[str, np.ndarray]
+
+
+def _floor_basis(normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return (u=right, v=forward) unit vectors lying in the floor plane."""
     x_cam = np.array([1.0, 0.0, 0.0])
     u = x_cam - (x_cam @ normal) * normal
@@ -33,7 +44,7 @@ def to_floor_2d(points: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
     return np.column_stack([points @ u, points @ v])
 
 
-def filter_above_floor(
+def _filter_above_floor(
     points: np.ndarray, n_floor: np.ndarray, d_floor: float
 ) -> np.ndarray:
     """Return boolean mask of points within the plausible furniture height range."""
@@ -41,7 +52,7 @@ def filter_above_floor(
     return (heights > _MIN_OBJECT_HEIGHT) & (heights < _MAX_OBJECT_HEIGHT)
 
 
-def largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+def _largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
     """Return boolean mask keeping only the largest connected cluster in floor 2D space."""
     coords = to_floor_2d(pts, u, v)
     px = to_map_px(coords)
@@ -97,16 +108,13 @@ def build_footprints(
     intrinsics: cal.Intrinsics,
     n_floor: np.ndarray,
     d_floor: float,
-) -> tuple[dict[str, np.ndarray], dict[str, float]]:
-    """Project segmented objects onto the floor plane across all frames.
-
-    Returns (footprints, surface_heights) where footprints maps label →
-    (N, 2) floor-2D coordinates, and surface_heights maps label → metres above floor.
-    """
-    u, v = floor_basis(n_floor)
+) -> FootprintResult:
+    """Project segmented objects onto the floor plane across all frames."""
+    u, v = _floor_basis(n_floor)
 
     class_2d: dict[str, np.ndarray] = {}
     surface_heights: dict[str, float] = {}
+    label_points: dict[str, np.ndarray] = {}
 
     for label, frame_mask in frame_masks.items():
         pts_list = []
@@ -122,7 +130,7 @@ def build_footprints(
             continue
 
         merged = np.vstack(pts_list)
-        above = filter_above_floor(merged, n_floor, d_floor)
+        above = _filter_above_floor(merged, n_floor, d_floor)
         filtered = merged[above]
         if len(filtered) < 10:
             continue
@@ -133,13 +141,20 @@ def build_footprints(
             tilt = float(np.degrees(np.arccos(
                 np.clip(abs(float(np.dot(planes[0].normal, n_floor))), 0.0, 1.0)
             )))
-            if tilt <= MAX_SURFACE_TILT_DEG:
+            if tilt <= _MAX_SURFACE_TILT_DEG:
                 filtered = filtered[planes[0].inliers]
 
-        comp_mask = largest_floor_component(filtered, u, v)
+        comp_mask = _largest_floor_component(filtered, u, v)
         filtered = filtered[comp_mask]
         if len(filtered) >= 3:
             class_2d[label] = to_floor_2d(filtered, u, v)
             surface_heights[label] = float(np.mean(filtered @ n_floor - d_floor))
+            label_points[label] = filtered
 
-    return class_2d, surface_heights
+    return FootprintResult(
+        footprints=class_2d,
+        surface_heights=surface_heights,
+        u_floor=u,
+        v_floor=v,
+        label_points=label_points,
+    )
