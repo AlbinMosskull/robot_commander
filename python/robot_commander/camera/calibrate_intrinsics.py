@@ -82,7 +82,7 @@ def calibrate(
         )
 
     assert image_size is not None
-    rms, camera_matrix, dist_coeffs, _rvecs, _tvecs = cv2.calibrateCamera(
+    rms, camera_matrix, dist_coeffs, _, _ = cv2.calibrateCamera(
         objpoints, imgpoints, image_size, None, None
     )
 

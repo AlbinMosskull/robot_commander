@@ -16,7 +16,6 @@ from robot_commander.depth_processing.calibrated_depth_processor import Calibrat
 from robot_commander.localization.localizer import Localizer
 
 _cfg = load_config()
-_TAG_SIZE = _cfg.tag.size_m
 
 
 def _depth_to_colormap(depth: np.ndarray) -> np.ndarray:
@@ -27,14 +26,14 @@ def _depth_to_colormap(depth: np.ndarray) -> np.ndarray:
 def main():
     intrinsics = cal.load()
     detector = TagDetector()
-    localizer = Localizer(detector, intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
 
     print("Loading Depth Anything V2 model...")
     processor = CalibratedDepthProcessor(localizer)
     print("Model loaded. Show 2 AprilTags and press C to calibrate. Press Q to quit.")
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         cam.warm_up()
 
         while True:

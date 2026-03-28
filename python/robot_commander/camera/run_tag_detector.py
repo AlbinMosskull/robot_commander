@@ -14,7 +14,7 @@ _cfg = load_config()
 def main():
     detector = TagDetector()
 
-    with Camera(device_index=0, width=1920, height=1080) as cam:
+    with Camera() as cam:
         print("Camera opened. Press 'q' to quit.")
         while True:
             ok, frame = cam.read()

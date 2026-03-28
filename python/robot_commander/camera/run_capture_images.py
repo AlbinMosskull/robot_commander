@@ -24,7 +24,7 @@ _cfg = load_config()
 def main():
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         print("Camera opened.")
         print("  SPACE       - capture frame")
         print("  y / ENTER   - approve and save")

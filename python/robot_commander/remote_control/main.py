@@ -30,7 +30,6 @@ from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.semantic_segmentor import SemanticSegmentor
 
-_TAG_SIZE = _cfg.tag.size_m
 # Maps every model label we care about to a canonical display name.
 # Mask2Former/COCO uses "diningtable" (no space) and sometimes "sofa" for couch.
 _OBJECT_CLASSES: dict[str, str] = {
@@ -249,12 +248,12 @@ def _main():
     print("Loading models...")
     intrinsics = cal.load()
     detector = TagDetector()
-    localizer = Localizer(detector, intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor(localizer)
     segmentor = SemanticSegmentor()
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         cam.warm_up()
 
         print("Waiting for 2 AprilTags to calibrate...")

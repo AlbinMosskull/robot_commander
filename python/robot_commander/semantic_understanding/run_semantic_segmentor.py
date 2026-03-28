@@ -53,7 +53,7 @@ def main():
     segmentor = SemanticSegmentor()
     print(f"Model loaded. Press 'q' to quit.")
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         while True:
             ok, frame = cam.read()
             if not ok:

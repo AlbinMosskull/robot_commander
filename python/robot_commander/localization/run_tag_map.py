@@ -22,7 +22,6 @@ from robot_commander.localization.localizer import Localizer
 from robot_commander.remote_control.main import _to_floor_2d, _to_map_px
 
 _cfg = load_config()
-_TAG_SIZE = _cfg.tag.size_m
 _TRAIL_LEN = 30    # past positions to show per tag ID
 
 _STENCIL_PATH = Path("output/debug/09_stencil_map.png")
@@ -97,12 +96,12 @@ def main():
 
     intrinsics = cal.load()
     detector = TagDetector()
-    localizer = Localizer(detector, intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
 
     trails: dict[int, collections.deque] = {}
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         print("Camera opened. Press 'q' to quit.")
         cam.warm_up()
 

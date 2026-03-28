@@ -36,6 +36,7 @@ import numpy as np
 
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
+from robot_commander.config import load as load_config
 from robot_commander.camera.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
@@ -51,8 +52,8 @@ from robot_commander.semantic_understanding.detection_segmentor import Detection
 from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
 from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
 
+_cfg = load_config()
 _DEBUG_DIR = Path("output/debug")
-_TAG_SIZE = _cfg.tag.size_m
 
 _CLASS_COLORS_BGR = {
     "dining table": (0,  80, 220),  # red-ish
@@ -356,7 +357,7 @@ def _main():
     print("Loading models...")
     intrinsics = cal.load()
     detector_model = TagDetector()
-    localizer = Localizer(detector_model, intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector_model, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
     depth_processor = CalibratedDepthProcessor(localizer)
 
@@ -365,7 +366,7 @@ def _main():
     print("Loading SAM model...")
     sam = SamSegmentor()
 
-    with Camera(device_index=0) as cam:
+    with Camera() as cam:
         cam.warm_up()
         calib_frame = _auto_calibrate(cam, depth_processor, detector_model)
         if calib_frame is None:

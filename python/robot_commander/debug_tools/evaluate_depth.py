@@ -29,7 +29,6 @@ from robot_commander.localization.localizer import Localizer
 _ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
 
 _cfg = load_config()
-_TAG_SIZE = _cfg.tag.size_m
 
 
 def _load_intrinsics() -> cal.Intrinsics:
@@ -221,12 +220,12 @@ def main():
     print("Loading depth model...")
     intrinsics = cal.load()
     detector = TagDetector()
-    localizer = Localizer(detector, intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector, intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=intrinsics.dist_coeffs)
     processor = CalibratedDepthProcessor(localizer)
 
     print("Opening camera...")
-    with Camera(0) as cam:
+    with Camera() as cam:
         print("Warming up camera...")
         cam.warm_up()
 

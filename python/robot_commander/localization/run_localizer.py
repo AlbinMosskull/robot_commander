@@ -13,16 +13,15 @@ from robot_commander.localization.localizer import Localizer
 
 _cfg = load_config()
 
-_TAG_SIZE = _cfg.tag.size_m
 
 
 def main():
     cam_intrinsics = calibration.load()
     detector = TagDetector()
-    localizer = Localizer(detector, cam_intrinsics.camera_matrix, _TAG_SIZE,
+    localizer = Localizer(detector, cam_intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=cam_intrinsics.dist_coeffs)
 
-    with Camera(device_index=0, width=1920, height=1080) as cam:
+    with Camera() as cam:
         print("Camera opened. Press 'q' to quit.")
         cam.warm_up()
 
