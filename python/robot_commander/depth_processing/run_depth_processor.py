@@ -11,10 +11,12 @@ import numpy as np
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.config import load as load_config
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.localization.localizer import Localizer
 
-_TAG_SIZE = 0.03  # physical side length of the AprilTags in metres
+_cfg = load_config()
+_TAG_SIZE = _cfg.tag.size_m
 
 
 def _depth_to_colormap(depth: np.ndarray) -> np.ndarray:

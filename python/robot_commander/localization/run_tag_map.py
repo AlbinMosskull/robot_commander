@@ -17,10 +17,12 @@ import numpy as np
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.config import load as load_config
 from robot_commander.localization.localizer import Localizer
 from robot_commander.remote_control.main import _to_floor_2d, _to_map_px
 
-_TAG_SIZE = 0.03   # physical tag side length in metres
+_cfg = load_config()
+_TAG_SIZE = _cfg.tag.size_m
 _TRAIL_LEN = 30    # past positions to show per tag ID
 
 _STENCIL_PATH = Path("output/debug/09_stencil_map.png")

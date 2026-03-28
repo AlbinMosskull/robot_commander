@@ -6,6 +6,9 @@ import cv2
 
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.config import load as load_config
+
+_cfg = load_config()
 
 
 def main():
@@ -25,7 +28,7 @@ def main():
             for tag in tags:
                 print(f"  Tag ID={tag.tag_id}  center={tag.center[0]:.1f}, {tag.center[1]:.1f}")
 
-            display = cv2.resize(annotated, (960, 540))
+            display = cv2.resize(annotated, (_cfg.camera.preview_width, _cfg.camera.preview_height))
             cv2.imshow("Tag Detection", display)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

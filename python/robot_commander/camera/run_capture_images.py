@@ -15,8 +15,10 @@ from pathlib import Path
 import cv2
 
 from robot_commander.camera.camera import Camera
+from robot_commander.config import load as load_config
 
 SAVE_DIR = Path("images/captured_images")
+_cfg = load_config()
 
 
 def main():
@@ -37,7 +39,7 @@ def main():
                 if not ok:
                     print("Failed to read frame.")
                     break
-                display = cv2.resize(frame.copy(), (960, 540))
+                display = cv2.resize(frame.copy(), (_cfg.camera.preview_width, _cfg.camera.preview_height))
                 cv2.putText(
                     display,
                     "Press SPACE to capture",
@@ -49,7 +51,7 @@ def main():
                 )
                 cv2.imshow("Capture Image", display)
             else:
-                display = cv2.resize(captured_frame.copy(), (960, 540))
+                display = cv2.resize(captured_frame.copy(), (_cfg.camera.preview_width, _cfg.camera.preview_height))
                 cv2.putText(
                     display,
                     "Approve? y=yes  n=no",

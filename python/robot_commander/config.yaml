@@ -1,0 +1,14 @@
+camera:
+  device_index: 0
+  width: 1920
+  height: 1080
+  preview_width: 960
+  preview_height: 540
+
+checkerboard:
+  cols: 9
+  rows: 6
+  square_size_m: 0.025
+
+tag:
+  size_m: 0.03

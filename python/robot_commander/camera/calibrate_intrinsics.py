@@ -17,16 +17,11 @@ import cv2
 import numpy as np
 
 from robot_commander.camera.intrinsics import Intrinsics
+from robot_commander.config import load as load_config
 
-
-# Inner corner count of the calibration checkerboard (columns, rows).
-CHECKERBOARD = (9, 6)
-
-# Physical size of one square in metres.
-# For a 9x6 inner-corner board (10x7 squares) printed on A4 the squares are ~25 mm.
-# Intrinsic parameters (focal length, principal point) are independent of this value;
-# it only affects the recovered translation vectors.
-SQUARE_SIZE_M = 0.025
+_cfg = load_config()
+CHECKERBOARD = (_cfg.checkerboard.cols, _cfg.checkerboard.rows)
+SQUARE_SIZE_M = _cfg.checkerboard.square_size_m
 
 
 def _object_points(checkerboard: tuple[int, int], square_size: float) -> np.ndarray:
@@ -113,24 +108,6 @@ def main() -> None:
         default=Path("intrinsics.npz"),
         help="Output path for the .npz file",
     )
-    parser.add_argument(
-        "--cols",
-        type=int,
-        default=CHECKERBOARD[0],
-        help=f"Inner corner columns on the checkerboard",
-    )
-    parser.add_argument(
-        "--rows",
-        type=int,
-        default=CHECKERBOARD[1],
-        help=f"Inner corner rows on the checkerboard",
-    )
-    parser.add_argument(
-        "--square-size",
-        type=float,
-        default=SQUARE_SIZE_M,
-        help=f"Physical square side length in metres",
-    )
     args = parser.parse_args()
 
     image_dir: Path = args.images
@@ -142,8 +119,8 @@ def main() -> None:
         raise SystemExit(f"No PNG/JPG images found in {image_dir}")
 
     print(f"Found {len(image_paths)} image(s) in {image_dir}")
-    intrinsics = calibrate(image_paths, checkerboard=(args.cols, args.rows), square_size=args.square_size)
-
+    intrinsics = calibrate(image_paths, checkerboard=CHECKERBOARD, square_size=SQUARE_SIZE_M)
+    
     print()
     print(intrinsics)
     intrinsics.save(args.output)

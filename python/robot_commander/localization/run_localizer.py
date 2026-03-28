@@ -8,9 +8,12 @@ import numpy as np
 from robot_commander.camera import intrinsics as calibration
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector, draw_tags
+from robot_commander.config import load as load_config
 from robot_commander.localization.localizer import Localizer
 
-_TAG_SIZE = 0.03  # physical side length of the tag in metres
+_cfg = load_config()
+
+_TAG_SIZE = _cfg.tag.size_m
 
 
 def main():
@@ -44,7 +47,7 @@ def main():
                 cv2.putText(annotated, "No tag detected", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-            display = cv2.resize(annotated, (960, 540))
+            display = cv2.resize(annotated, (_cfg.camera.preview_width, _cfg.camera.preview_height))
             cv2.imshow("Localization", display)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break

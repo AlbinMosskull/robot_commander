@@ -19,6 +19,7 @@ import numpy as np
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
 from robot_commander.camera.tag_detector import TagDetector
+from robot_commander.config import load as load_config
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.depth_processing.calibration_ui import capture_calibration_frame
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
@@ -27,7 +28,8 @@ from robot_commander.localization.localizer import Localizer
 
 _ROI_CACHE_PATH = Path(__file__).parent / ".roi_cache.json"
 
-_TAG_SIZE = 0.03  # physical side length of the AprilTags in metres
+_cfg = load_config()
+_TAG_SIZE = _cfg.tag.size_m
 
 
 def _load_intrinsics() -> cal.Intrinsics:

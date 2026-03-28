@@ -52,7 +52,7 @@ from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
 from robot_commander.semantic_understanding.semantic_segmentor import SegmentationResult
 
 _DEBUG_DIR = Path("output/debug")
-_TAG_SIZE = 0.03
+_TAG_SIZE = _cfg.tag.size_m
 
 _CLASS_COLORS_BGR = {
     "dining table": (0,  80, 220),  # red-ish

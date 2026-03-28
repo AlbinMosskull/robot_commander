@@ -22,6 +22,7 @@ import numpy as np
 
 from robot_commander.camera import intrinsics as cal
 from robot_commander.camera.camera import Camera
+from robot_commander.config import load as load_config
 from robot_commander.camera.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
@@ -29,7 +30,7 @@ from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.semantic_segmentor import SemanticSegmentor
 
-_TAG_SIZE = 0.03
+_TAG_SIZE = _cfg.tag.size_m
 # Maps every model label we care about to a canonical display name.
 # Mask2Former/COCO uses "diningtable" (no space) and sometimes "sofa" for couch.
 _OBJECT_CLASSES: dict[str, str] = {
@@ -37,6 +38,7 @@ _OBJECT_CLASSES: dict[str, str] = {
     "couch":        "couch",
     # "chair":        "chair",
 }
+_cfg = load_config()
 _NUM_FRAMES = 5          # frames to capture for segmentation coverage
 _FRAME_INTERVAL_S = 0.3  # seconds between captures
 _MAP_SCALE = 150         # pixels per metre
@@ -370,7 +372,7 @@ def _main():
     print(f"Saved to {_OUTPUT_DIR}/")
 
     cv2.imshow("Stencil Map", stencil)
-    cv2.imshow("Frame", cv2.resize(frames[0], (960, 540)))
+    cv2.imshow("Frame", cv2.resize(frames[0], (_cfg.camera.preview_width, _cfg.camera.preview_height)))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 

@@ -1,5 +1,9 @@
 import cv2
 
+from robot_commander.config import load as load_config
+
+_cfg = load_config()
+
 
 class Camera:
     """
@@ -10,7 +14,7 @@ class Camera:
                       Find the index by running `ls /dev/video*` on Linux.
     """
 
-    def __init__(self, device_index: int = 0, width: int | None = 1920, height: int | None = 1080):
+    def __init__(self, device_index: int = _cfg.camera.device_index, width: int | None = _cfg.camera.width, height: int | None = _cfg.camera.height):
         self._cap = cv2.VideoCapture(device_index)
         if not self._cap.isOpened():
             raise RuntimeError(f"Could not open camera at device index {device_index}")
