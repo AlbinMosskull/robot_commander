@@ -18,6 +18,7 @@ message Ray {
   float start_y = 2;
   float end_x = 3;
   float end_y = 4;
+  bool did_collide = 5;
 }
 
 message RayBatch {

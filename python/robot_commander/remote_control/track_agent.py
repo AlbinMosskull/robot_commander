@@ -74,9 +74,9 @@ def main():
     def stream_rays_thread():
         for rays in client.stream_rays():
             with occ_lock:
-                for sx, sy, ex, ey in rays:
+                for sx, sy, ex, ey, did_collide in rays:
                     try:
-                        occ_map.ray_update(sx, sy, ex, ey)
+                        occ_map.ray_update(sx, sy, ex, ey, did_collide)
                     except Exception:
                         pass
 

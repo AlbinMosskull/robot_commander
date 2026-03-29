@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!robot_commander/proto/agent.proto\x12\x05\x61gent\" \n\x08Position\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\"E\n\x03Ray\x12\x0f\n\x07start_x\x18\x01 \x01(\x02\x12\x0f\n\x07start_y\x18\x02 \x01(\x02\x12\r\n\x05\x65nd_x\x18\x03 \x01(\x02\x12\r\n\x05\x65nd_y\x18\x04 \x01(\x02\"$\n\x08RayBatch\x12\x18\n\x04rays\x18\x01 \x03(\x0b\x32\n.agent.Ray\"\x07\n\x05\x45mpty2\xa0\x01\n\x0c\x41gentControl\x12.\n\rSetCheckpoint\x12\x0f.agent.Position\x1a\x0c.agent.Empty\x12\x31\n\x0eStreamPosition\x12\x0c.agent.Empty\x1a\x0f.agent.Position0\x01\x12-\n\nStreamRays\x12\x0c.agent.Empty\x1a\x0f.agent.RayBatch0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!robot_commander/proto/agent.proto\x12\x05\x61gent\" \n\x08Position\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\"Z\n\x03Ray\x12\x0f\n\x07start_x\x18\x01 \x01(\x02\x12\x0f\n\x07start_y\x18\x02 \x01(\x02\x12\r\n\x05\x65nd_x\x18\x03 \x01(\x02\x12\r\n\x05\x65nd_y\x18\x04 \x01(\x02\x12\x13\n\x0b\x64id_collide\x18\x05 \x01(\x08\"$\n\x08RayBatch\x12\x18\n\x04rays\x18\x01 \x03(\x0b\x32\n.agent.Ray\"\x07\n\x05\x45mpty2\xa0\x01\n\x0c\x41gentControl\x12.\n\rSetCheckpoint\x12\x0f.agent.Position\x1a\x0c.agent.Empty\x12\x31\n\x0eStreamPosition\x12\x0c.agent.Empty\x1a\x0f.agent.Position0\x01\x12-\n\nStreamRays\x12\x0c.agent.Empty\x1a\x0f.agent.RayBatch0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,11 +34,11 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_POSITION']._serialized_start=44
   _globals['_POSITION']._serialized_end=76
   _globals['_RAY']._serialized_start=78
-  _globals['_RAY']._serialized_end=147
-  _globals['_RAYBATCH']._serialized_start=149
-  _globals['_RAYBATCH']._serialized_end=185
-  _globals['_EMPTY']._serialized_start=187
-  _globals['_EMPTY']._serialized_end=194
-  _globals['_AGENTCONTROL']._serialized_start=197
-  _globals['_AGENTCONTROL']._serialized_end=357
+  _globals['_RAY']._serialized_end=168
+  _globals['_RAYBATCH']._serialized_start=170
+  _globals['_RAYBATCH']._serialized_end=206
+  _globals['_EMPTY']._serialized_start=208
+  _globals['_EMPTY']._serialized_end=215
+  _globals['_AGENTCONTROL']._serialized_start=218
+  _globals['_AGENTCONTROL']._serialized_end=378
 # @@protoc_insertion_point(module_scope)
