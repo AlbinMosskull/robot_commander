@@ -17,14 +17,14 @@ from robot_commander.depth_processing.calibrated_depth_processor import Calibrat
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 from robot_commander.remote_control.map_drawing import draw_stencil_map
-from robot_commander.remote_control.map_geometry import FootprintResult, to_floor_2d, build_footprints
+from robot_commander.remote_control.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
 from robot_commander.remote_control.debug_map_building import (
     check_depth_and_save_vis,
     save_mask_vis,
     save_scatter,
     check_tag_normals,
     save_surface_vis,
-    debug_floor_plane,
+    save_floor_vis,
 )
 
 _cfg = load_config()
@@ -88,6 +88,14 @@ def _main():
 
     print("Gathering frames...")
     frames, depth0 = _gather_frames(cam, depth_processor, localizer)
+    print("\nDetecting object masks...")
+    frame_masks = {
+        r.label: r.mask
+        for r in segmentor.process(frames[0])
+        if r.label in _TARGET_LABELS
+    }
+    print(f"  Detected classes: {list(frame_masks.keys())}")
+
 
     do_plot = args.plot_debug
     if do_plot:
@@ -95,41 +103,33 @@ def _main():
 
         check_depth_and_save_vis(frames[0], depth0, _DEBUG_DIR / "02_depth.png")
 
-        print("\nDetecting object masks...")
-        frame_masks = {
-            r.label: r.mask
-            for r in segmentor.process(frames[0])
-            if r.label in _TARGET_LABELS
-        }
-        print(f"  Detected classes: {list(frame_masks.keys())}")
         save_mask_vis(frames[0], frame_masks, _CLASS_COLORS_BGR, _DEBUG_DIR / "03_roi_masks.jpg")
 
 
-    floor = debug_floor_plane(frames[0], depth0, intrinsics, _DEBUG_DIR / "04_floor_ransac.jpg")
+    floor = detect_floor(depth0, intrinsics)
     if floor is None:
-        return
-    n_floor, d_floor = floor
+        raise SystemExit("Floor plane detection failed, cannot proceed.")
 
-    print(f"\n[APRIL TAG NORMALS vs FLOOR]")
-    check_tag_normals(localizer, frames[0], n_floor)
+    if do_plot:
+        save_floor_vis(frames[0], depth0, floor, _DEBUG_DIR / "04_floor_ransac.jpg")
+        check_tag_normals(localizer, frames[0], floor.normal)
 
-    camera_height = float(abs(d_floor))
     depths = [depth0] + [depth_processor.process(f) for f in frames[1:]]
-    result: FootprintResult = build_footprints(depths, frame_masks, intrinsics, n_floor, d_floor)
+    result: FootprintResult = build_footprints(depths, frame_masks, intrinsics, floor.normal, floor.distance)
     np.savez(_DEBUG_DIR / "floor_basis.npz", u_vec=result.u_floor, v_vec=result.v_floor)
 
     if do_plot:
         print(f"\n[PER-CLASS SURFACE]")
         for canonical, pts_3d in result.label_points.items():
-            fname = "06_table_surface.jpg" if "table" in canonical else "06_couch_surface.jpg"
+            fname = f"05_{canonical.replace(' ', '_')}_surface.jpg"
             save_surface_vis(frames[0], pts_3d, intrinsics, canonical, _DEBUG_DIR / fname)
 
-        save_scatter(result.footprints, _DEBUG_DIR / "08_scatter.png")
+        save_scatter(result.footprints, _DEBUG_DIR / "06_scatter.png")
 
-        print(f"\n[SHADOW] camera height: {camera_height:.3f} m  |  surface heights: "
+        print(f"\n[SHADOW] camera height: {abs(floor.distance):.3f} m  |  surface heights: "
             + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
 
-    stencil = draw_stencil_map(result.footprints, intrinsics, camera_height, result.surface_heights)
+    stencil = draw_stencil_map(result.footprints, intrinsics, abs(floor.distance), result.surface_heights)
     cv2.imwrite(str(_OUTPUT_DIR / "stencil_map.png"), stencil)
 
 

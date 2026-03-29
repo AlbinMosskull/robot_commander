@@ -9,7 +9,7 @@ import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.ransac import detect_planes
+from robot_commander.depth_processing.ransac import detect_planes, Plane
 from robot_commander.remote_control.map_drawing import _MAP_H, _MAP_W, to_map_px
 
 _MIN_OBJECT_HEIGHT = 0.10
@@ -90,16 +90,16 @@ def _resize_mask_to(mask: np.ndarray, shape: tuple) -> np.ndarray:
 def detect_floor(
     depth: np.ndarray,
     intrinsics: cal.Intrinsics,
-) -> tuple[np.ndarray, float] | None:
-    """Detect the dominant floor plane. Returns (normal, distance) with normal pointing toward camera."""
+) -> Plane | None:
+    """Detect the dominant floor plane. Returns a Plane with normal pointing toward camera."""
     pts = depth_image_to_point_cloud(depth, intrinsics)
     planes = detect_planes(pts, n_planes=1, n_iterations=500, distance_threshold=0.03)
     if not planes:
         return None
-    n, d = planes[0].normal, planes[0].distance
-    if d > 0:
-        n, d = -n, -d
-    return n, d
+    plane = planes[0]
+    if plane.distance > 0:
+        plane = Plane(normal=-plane.normal, distance=-plane.distance, inliers=plane.inliers)
+    return plane
 
 
 def build_footprints(

@@ -11,8 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.ransac import detect_planes
+from robot_commander.depth_processing.ransac import Plane
 from robot_commander.localization.localizer import Localizer
 
 
@@ -133,38 +132,24 @@ def check_tag_normals(
               "or floor RANSAC found the wrong surface ***")
 
 
-def debug_floor_plane(
+def save_floor_vis(
     frame: np.ndarray,
     depth: np.ndarray,
-    intrinsics: cal.Intrinsics,
+    floor: Plane,
     path: Path,
-) -> tuple[np.ndarray, float] | None:
-    """Detect floor plane, print diagnostics, save RANSAC overlay. Returns (normal, distance) or None."""
-    all_pts = depth_image_to_point_cloud(depth, intrinsics)
-    print(f"\n[POINT CLOUD] {len(all_pts)} points (frame 0)")
-
-    floor_planes = detect_planes(all_pts, n_planes=1, n_iterations=500, distance_threshold=0.03)
-    if not floor_planes:
-        print("Floor plane not found.")
-        return None
-
-    n_floor = floor_planes[0].normal
-    d_floor = floor_planes[0].distance
-    if d_floor > 0:
-        n_floor, d_floor = -n_floor, -d_floor
-
+) -> None:
+    """Print floor plane diagnostics and save the RANSAC inlier overlay."""
+    print(f"\n[POINT CLOUD] {floor.inliers.size} points (frame 0)")
     print(f"\n[FLOOR PLANE]")
-    print(f"  normal        : {n_floor.round(4)}")
-    print(f"  camera height : {abs(d_floor):.3f} m")
-    tilt = np.degrees(np.arccos(np.clip(abs(n_floor[1]), 0, 1)))
+    print(f"  normal        : {floor.normal.round(4)}")
+    print(f"  camera height : {abs(floor.distance):.3f} m")
+    tilt = np.degrees(np.arccos(np.clip(abs(floor.normal[1]), 0, 1)))
     print(f"  tilt from cam-Y axis: {tilt:.1f}°")
-    print(f"  inliers       : {floor_planes[0].inliers.sum()} / {len(all_pts)}")
+    print(f"  inliers       : {floor.inliers.sum()} / {floor.inliers.size}")
 
-    overlay = ransac_overlay(frame, depth, floor_planes[0].inliers,
+    overlay = ransac_overlay(frame, depth, floor.inliers,
                              color_inlier=(0, 220, 0), color_outlier=(40, 40, 40))
     cv2.imwrite(str(path), overlay)
-
-    return n_floor, d_floor
 
 
 def save_surface_vis(
