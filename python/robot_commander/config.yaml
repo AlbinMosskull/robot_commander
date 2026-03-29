@@ -12,3 +12,6 @@ checkerboard:
 
 tag:
   size_m: 0.03
+
+agent:
+  port: 50051

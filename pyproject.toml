@@ -13,6 +13,8 @@ dependencies = [
     "timm>=1.0.26",
     "torch>=2.10.0",
     "transformers>=5.3.0",
+    "grpcio>=1.73.0",
+    "grpcio-tools>=1.73.0",
 ]
 
 [tool.setuptools.packages.find]

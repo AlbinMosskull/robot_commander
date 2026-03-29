@@ -10,7 +10,7 @@ import numpy as np
 from robot_commander.image_processing import intrinsics as cal
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes, Plane
-from robot_commander.map_building.map_drawing import _MAP_H, _MAP_W, to_map_px
+from robot_commander.map_building.map_coordinates import _MAP_H, _MAP_W, to_map_px
 
 _MIN_OBJECT_HEIGHT = 0.10
 _MAX_OBJECT_HEIGHT = 1.50

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package agent;
+
+service AgentControl {
+  rpc SetCheckpoint (Position) returns (Empty);
+  rpc StreamPosition (Empty) returns (stream Position);
+}
+
+message Position {
+  float x = 1;
+  float y = 2;
+}
+
+message Empty {}

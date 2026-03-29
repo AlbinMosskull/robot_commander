@@ -2,18 +2,7 @@ import cv2
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-
-_MAP_SCALE = 150
-_MAP_W, _MAP_H = 600, 600
-_MAP_ORIGIN = (300, 540)
-
-
-def to_map_px(coords_2d: np.ndarray) -> np.ndarray:
-    ox, oy = _MAP_ORIGIN
-    return np.column_stack([
-        (ox + coords_2d[:, 0] * _MAP_SCALE).astype(np.int32),
-        (oy - coords_2d[:, 1] * _MAP_SCALE).astype(np.int32),
-    ])
+from robot_commander.map_building.map_coordinates import _MAP_ORIGIN, _MAP_W, _MAP_H, to_map_px
 
 
 def _shadow_polygon(

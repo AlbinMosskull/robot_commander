@@ -28,10 +28,16 @@ class TagConfig:
 
 
 @dataclass(frozen=True)
+class AgentConfig:
+    port: int
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig
     checkerboard: CheckerboardConfig
     tag: TagConfig
+    agent: AgentConfig
 
 
 def load(path: Path = _CONFIG_PATH) -> Config:
@@ -53,5 +59,8 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         ),
         tag=TagConfig(
             size_m=raw["tag"]["size_m"],
+        ),
+        agent=AgentConfig(
+            port=raw["agent"]["port"],
         ),
     )
