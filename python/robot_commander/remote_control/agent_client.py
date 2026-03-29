@@ -16,5 +16,9 @@ class AgentClient:
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
             yield pos.x, pos.y
 
+    def stream_rays(self):
+        for batch in self._stub.StreamRays(agent_pb2.Empty()):
+            yield [(r.start_x, r.start_y, r.end_x, r.end_y) for r in batch.rays]
+
     def close(self) -> None:
         self._channel.close()

@@ -2,11 +2,40 @@ import threading
 from pathlib import Path
 
 import cv2
+import numpy as np
 
-from robot_commander.map_building.map_coordinates import px_to_world, world_to_px
+from robot_commander import OccupancyMap
+from robot_commander.map_building.map_coordinates import (
+    _MAP_H, _MAP_W, _MAP_ORIGIN, _MAP_SCALE,
+    px_to_world, world_to_px,
+)
 from robot_commander.remote_control.agent_client import AgentClient
 
 _STENCIL_PATH = Path("plots/output/stencil_map.png")
+
+_OCC_RESOLUTION = 0.05
+_OCC_ORIGIN_X = -_MAP_ORIGIN[0] / _MAP_SCALE
+_OCC_ORIGIN_Y = (_MAP_ORIGIN[1] - _MAP_H) / _MAP_SCALE
+_OCC_WIDTH = round(_MAP_W / (_MAP_SCALE * _OCC_RESOLUTION))
+_OCC_HEIGHT = round(_MAP_H / (_MAP_SCALE * _OCC_RESOLUTION))
+
+_FREE_THRESHOLD = 0.3
+_OCCUPIED_THRESHOLD = 0.7
+_OVERLAY_ALPHA = 0.45
+
+
+def _draw_occupancy_overlay(canvas: np.ndarray, occ_map: OccupancyMap) -> None:
+    grid = np.array(occ_map.get_grid(), dtype=np.float32)
+    grid = np.flipud(grid)
+    grid = cv2.resize(grid, (_MAP_W, _MAP_H), interpolation=cv2.INTER_NEAREST)
+
+    overlay = canvas.copy()
+    overlay[grid < _FREE_THRESHOLD] = (0, 200, 0)
+    overlay[grid > _OCCUPIED_THRESHOLD] = (0, 0, 200)
+
+    known = (grid < _FREE_THRESHOLD) | (grid > _OCCUPIED_THRESHOLD)
+    blended = cv2.addWeighted(overlay, _OVERLAY_ALPHA, canvas, 1 - _OVERLAY_ALPHA, 0)
+    canvas[known] = blended[known]
 
 
 def main():
@@ -16,6 +45,14 @@ def main():
 
     background = cv2.imread(str(_STENCIL_PATH))
     client = AgentClient()
+    occ_map = OccupancyMap(
+        width=_OCC_WIDTH,
+        height=_OCC_HEIGHT,
+        resolution=_OCC_RESOLUTION,
+        origin_x=_OCC_ORIGIN_X,
+        origin_y=_OCC_ORIGIN_Y,
+    )
+    occ_lock = threading.Lock()
 
     checkpoint: tuple[float, float] | None = None
     agent_pos: tuple[float, float] | None = None
@@ -28,14 +65,23 @@ def main():
             checkpoint = (wx, wy)
             client.set_checkpoint(wx, wy)
 
-    def stream_thread():
+    def stream_pos_thread():
         nonlocal agent_pos
         for x, y in client.stream_positions():
             with pos_lock:
                 agent_pos = (x, y)
 
-    t = threading.Thread(target=stream_thread, daemon=True)
-    t.start()
+    def stream_rays_thread():
+        for rays in client.stream_rays():
+            with occ_lock:
+                for sx, sy, ex, ey in rays:
+                    try:
+                        occ_map.ray_update(sx, sy, ex, ey)
+                    except Exception:
+                        pass
+
+    threading.Thread(target=stream_pos_thread, daemon=True).start()
+    threading.Thread(target=stream_rays_thread, daemon=True).start()
 
     cv2.namedWindow("Agent Map")
     cv2.setMouseCallback("Agent Map", on_mouse)
@@ -43,6 +89,9 @@ def main():
     print("Click on the map to place a checkpoint. Press 'q' to quit.")
     while True:
         canvas = background.copy()
+
+        with occ_lock:
+            _draw_occupancy_overlay(canvas, occ_map)
 
         if checkpoint is not None:
             px = world_to_px(*checkpoint)

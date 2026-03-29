@@ -76,6 +76,10 @@ impl OccupancyMap {
     pub fn set_all_unoccupied(&mut self) {
         self.occupancy_prob_map = vec![vec![0.0; self.width]; self.height]
     }
+
+    pub fn get_grid(&self) -> Vec<Vec<f32>> {
+        self.occupancy_prob_map.clone()
+    }
 }
 
 impl OccupancyMap {

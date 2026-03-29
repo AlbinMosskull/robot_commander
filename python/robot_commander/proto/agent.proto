@@ -5,11 +5,23 @@ package agent;
 service AgentControl {
   rpc SetCheckpoint (Position) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
+  rpc StreamRays (Empty) returns (stream RayBatch);
 }
 
 message Position {
   float x = 1;
   float y = 2;
+}
+
+message Ray {
+  float start_x = 1;
+  float start_y = 2;
+  float end_x = 3;
+  float end_y = 4;
+}
+
+message RayBatch {
+  repeated Ray rays = 1;
 }
 
 message Empty {}
