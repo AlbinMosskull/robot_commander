@@ -41,11 +41,17 @@ def ransac_overlay(
     return vis
 
 
-def save_depth_vis(depth: np.ndarray, path: Path) -> np.ndarray:
+def check_depth_and_save_vis(color: np.ndarray, depth: np.ndarray, path: Path) -> None:
+    print(f"\n[SHAPE CHECK]")
+    print(f"  frame : {color.shape[:2]}  depth : {depth.shape}", end="  ")
+    if color.shape[:2] != depth.shape:
+        print("*** MISMATCH — intrinsics do not match depth pixels ***")
+    else:
+        print("✓ match")
+    
     norm = cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     colored = cv2.applyColorMap(norm, cv2.COLORMAP_INFERNO)
     cv2.imwrite(str(path), colored)
-    return colored
 
 
 def save_mask_vis(
