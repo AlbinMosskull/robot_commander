@@ -16,9 +16,9 @@ from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
-from robot_commander.remote_control.map_drawing import draw_stencil_map
-from robot_commander.remote_control.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
-from robot_commander.remote_control.debug_map_building import (
+from robot_commander.map_building.map_drawing import draw_stencil_map
+from robot_commander.map_building.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
+from robot_commander.map_building.debug_map_building import (
     check_depth_and_save_vis,
     save_mask_vis,
     save_scatter,
@@ -77,6 +77,7 @@ def _main():
     cam = WebCamera() if args.camera == "webcam" else FromFileCamera(Path(args.camera))
 
     _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     print("Loading models...")
     intrinsics = cal.load()
