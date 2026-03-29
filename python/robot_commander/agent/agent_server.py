@@ -18,6 +18,8 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         self._agent = Agent(x=0.0, y=0.0, v=0.05)
         self._lock = threading.Lock()
         self._goal: tuple[float, float] | None = None
+        self._waypoints: list[tuple[float, float]] = []
+        self._waypoint_idx: int = 0
         self._ray: tuple[float, float, float, float, bool] | None = None
         self._sweep_offset: float = -math.radians(_SWEEP_DEG / 2)
         self._sweep_dir: float = 1.0
@@ -28,7 +30,14 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
     def _tick_loop(self):
         while True:
             with self._lock:
-                if self._goal is not None:
+                if self._waypoints:
+                    wx, wy = self._waypoints[self._waypoint_idx]
+                    self._agent.move(wx, wy)
+                    if math.hypot(self._agent.x - wx, self._agent.y - wy) < 1e-3:
+                        self._waypoint_idx += 1
+                        if self._waypoint_idx >= len(self._waypoints):
+                            self._waypoints = []
+                elif self._goal is not None:
                     self._agent.move(*self._goal)
                 x, y = self._agent.x, self._agent.y
                 half_sweep = math.radians(_SWEEP_DEG / 2)
@@ -45,7 +54,15 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
 
     def SetCheckpoint(self, request, context):
         with self._lock:
+            self._waypoints = []
             self._goal = (request.x, request.y)
+        return agent_pb2.Empty()
+
+    def SetPath(self, request, context):
+        with self._lock:
+            self._goal = None
+            self._waypoints = [(p.x, p.y) for p in request.waypoints]
+            self._waypoint_idx = 0
         return agent_pb2.Empty()
 
     def StreamPosition(self, request, context):
@@ -74,7 +91,10 @@ def main():
     server.add_insecure_port(f"[::]:{port}")
     server.start()
     print(f"Agent server listening on port {port}")
-    server.wait_for_termination()
+    try:
+        server.wait_for_termination()
+    except KeyboardInterrupt:
+        server.stop(grace=None)
 
 
 if __name__ == "__main__":

@@ -4,12 +4,14 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander import OccupancyMap
+from robot_commander import OccupancyMap, WorldPosition2d, plan_path
 from robot_commander.map_building.map_coordinates import (
     _MAP_H, _MAP_W, _MAP_ORIGIN, _MAP_SCALE,
     px_to_world, world_to_px,
 )
 from robot_commander.remote_control.agent_client import AgentClient
+
+_PATH_COLLISION_MARGIN = 0.08
 
 _STENCIL_PATH = Path("plots/output/stencil_map.png")
 
@@ -55,62 +57,109 @@ def main():
     occ_lock = threading.Lock()
 
     checkpoint: tuple[float, float] | None = None
+    planned_path: list[tuple[float, float]] = []
     agent_pos: tuple[float, float] | None = None
     pos_lock = threading.Lock()
+    stop_event = threading.Event()
 
     def on_mouse(event, x, y, flags, param):
-        nonlocal checkpoint
-        if event == cv2.EVENT_LBUTTONDOWN:
-            wx, wy = px_to_world(x, y)
+        nonlocal checkpoint, planned_path
+        if event != cv2.EVENT_LBUTTONDOWN:
+            return
+        wx, wy = px_to_world(x, y)
+        if flags & cv2.EVENT_FLAG_SHIFTKEY:
+            with pos_lock:
+                start = agent_pos
+            if start is None:
+                return
+            with occ_lock:
+                result = plan_path(
+                    occ_map,
+                    WorldPosition2d(start[0], start[1]),
+                    WorldPosition2d(wx, wy),
+                    _PATH_COLLISION_MARGIN,
+                )
+            if result is None:
+                print("No path found")
+                return
+            planned_path = [(p.x, p.y) for p in result]
+            checkpoint = None
+            client.set_path(planned_path)
+        else:
             checkpoint = (wx, wy)
+            planned_path = []
             client.set_checkpoint(wx, wy)
 
     def stream_pos_thread():
         nonlocal agent_pos
-        for x, y in client.stream_positions():
-            with pos_lock:
-                agent_pos = (x, y)
+        try:
+            for x, y in client.stream_positions():
+                if stop_event.is_set():
+                    break
+                with pos_lock:
+                    agent_pos = (x, y)
+        except Exception:
+            pass
 
     def stream_rays_thread():
-        for rays in client.stream_rays():
-            with occ_lock:
-                for sx, sy, ex, ey, did_collide in rays:
-                    try:
-                        occ_map.ray_update(sx, sy, ex, ey, did_collide)
-                    except Exception:
-                        pass
+        try:
+            for rays in client.stream_rays():
+                if stop_event.is_set():
+                    break
+                with occ_lock:
+                    for sx, sy, ex, ey, did_collide in rays:
+                        try:
+                            occ_map.ray_update(sx, sy, ex, ey, did_collide)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
-    threading.Thread(target=stream_pos_thread, daemon=True).start()
-    threading.Thread(target=stream_rays_thread, daemon=True).start()
+    pos_thread = threading.Thread(target=stream_pos_thread)
+    rays_thread = threading.Thread(target=stream_rays_thread)
+    pos_thread.start()
+    rays_thread.start()
 
     cv2.namedWindow("Agent Map")
     cv2.setMouseCallback("Agent Map", on_mouse)
 
-    print("Click on the map to place a checkpoint. Press 'q' to quit.")
-    while True:
-        canvas = background.copy()
+    print("Left-click: set checkpoint. Shift+click: plan path. Press 'q' to quit.")
+    try:
+        while True:
+            canvas = background.copy()
 
-        with occ_lock:
-            _draw_occupancy_overlay(canvas, occ_map)
+            with occ_lock:
+                _draw_occupancy_overlay(canvas, occ_map)
 
-        if checkpoint is not None:
-            px = world_to_px(*checkpoint)
-            cv2.circle(canvas, px, 8, (0, 200, 0), -1)
-            cv2.circle(canvas, px, 8, (0, 0, 0), 1)
+            if planned_path:
+                pts = [world_to_px(wx, wy) for wx, wy in planned_path]
+                for a, b in zip(pts, pts[1:]):
+                    cv2.line(canvas, a, b, (0, 200, 0), 2)
+                cv2.circle(canvas, pts[-1], 8, (0, 200, 0), -1)
+                cv2.circle(canvas, pts[-1], 8, (0, 0, 0), 1)
+            elif checkpoint is not None:
+                px = world_to_px(*checkpoint)
+                cv2.circle(canvas, px, 8, (0, 200, 0), -1)
+                cv2.circle(canvas, px, 8, (0, 0, 0), 1)
 
-        with pos_lock:
-            pos = agent_pos
-        if pos is not None:
-            px = world_to_px(*pos)
-            cv2.circle(canvas, px, 8, (200, 80, 0), -1)
-            cv2.circle(canvas, px, 8, (0, 0, 0), 1)
+            with pos_lock:
+                pos = agent_pos
+            if pos is not None:
+                px = world_to_px(*pos)
+                cv2.circle(canvas, px, 8, (200, 80, 0), -1)
+                cv2.circle(canvas, px, 8, (0, 0, 0), 1)
 
-        cv2.imshow("Agent Map", canvas)
-        if cv2.waitKey(30) & 0xFF == ord("q"):
-            break
-
-    client.close()
-    cv2.destroyAllWindows()
+            cv2.imshow("Agent Map", canvas)
+            if cv2.waitKey(30) & 0xFF == ord("q"):
+                break
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop_event.set()
+        client.close()
+        pos_thread.join(timeout=2)
+        rays_thread.join(timeout=2)
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

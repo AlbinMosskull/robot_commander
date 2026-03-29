@@ -39,6 +39,11 @@ class AgentControlStub(object):
                 request_serializer=robot__commander_dot_proto_dot_agent__pb2.Position.SerializeToString,
                 response_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
                 _registered_method=True)
+        self.SetPath = channel.unary_unary(
+                '/agent.AgentControl/SetPath',
+                request_serializer=robot__commander_dot_proto_dot_agent__pb2.Path.SerializeToString,
+                response_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+                _registered_method=True)
         self.StreamPosition = channel.unary_stream(
                 '/agent.AgentControl/StreamPosition',
                 request_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
@@ -55,6 +60,12 @@ class AgentControlServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def SetCheckpoint(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetPath(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -78,6 +89,11 @@ def add_AgentControlServicer_to_server(servicer, server):
             'SetCheckpoint': grpc.unary_unary_rpc_method_handler(
                     servicer.SetCheckpoint,
                     request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Position.FromString,
+                    response_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
+            ),
+            'SetPath': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetPath,
+                    request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Path.FromString,
                     response_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
             ),
             'StreamPosition': grpc.unary_stream_rpc_method_handler(
@@ -117,6 +133,33 @@ class AgentControl(object):
             target,
             '/agent.AgentControl/SetCheckpoint',
             robot__commander_dot_proto_dot_agent__pb2.Position.SerializeToString,
+            robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetPath(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.AgentControl/SetPath',
+            robot__commander_dot_proto_dot_agent__pb2.Path.SerializeToString,
             robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
             options,
             channel_credentials,

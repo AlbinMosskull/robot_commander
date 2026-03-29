@@ -4,8 +4,13 @@ package agent;
 
 service AgentControl {
   rpc SetCheckpoint (Position) returns (Empty);
+  rpc SetPath (Path) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
   rpc StreamRays (Empty) returns (stream RayBatch);
+}
+
+message Path {
+  repeated Position waypoints = 1;
 }
 
 message Position {

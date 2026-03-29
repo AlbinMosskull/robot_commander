@@ -12,6 +12,10 @@ class AgentClient:
     def set_checkpoint(self, x: float, y: float) -> None:
         self._stub.SetCheckpoint(agent_pb2.Position(x=x, y=y))
 
+    def set_path(self, waypoints: list[tuple[float, float]]) -> None:
+        path = agent_pb2.Path(waypoints=[agent_pb2.Position(x=x, y=y) for x, y in waypoints])
+        self._stub.SetPath(path)
+
     def stream_positions(self):
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
             yield pos.x, pos.y
