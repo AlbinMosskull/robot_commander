@@ -1,18 +1,56 @@
 use std::collections::HashMap;
 use std::cmp::Ordering;
 
+use pyo3::prelude::*;
+
 use crate::occupancy_map::occupancy_map::OccupancyMap;
 use crate::core::min_heap::MinHeap;
 
 
+#[pyclass]
+#[derive(Copy, Clone)]
+pub struct WorldPosition2d {
+    #[pyo3(get)]
+    pub x: f32,
+    #[pyo3(get)]
+    pub y: f32,
+}
+
+#[pymethods]
+impl WorldPosition2d {
+    #[new]
+    pub fn new(x: f32, y: f32) -> Self {
+        WorldPosition2d { x, y }
+    }
+}
+
+#[pyfunction]
+pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d) -> Option<Vec<WorldPosition2d>> {
+    let start_tuple = occ_map.convert_coordinate_to_index(world_start.x, world_start.y)?;
+    let goal_tuple = occ_map.convert_coordinate_to_index(world_goal.x, world_goal.y)?;
+    
+    let start = Position2d { x: start_tuple.0 as isize, y: start_tuple.1 as isize };
+    let goal = Position2d { x: goal_tuple.0 as isize, y: goal_tuple.1 as isize };
+
+    let positions = plan_path_indices(occ_map, start, goal)?;
+    let mut world_indices: Vec<WorldPosition2d> = Vec::new();
+    for position in positions {
+        let world_coordinates = occ_map.convert_index_to_coordinate(position.x as usize, position.y as usize);
+        let world_point = WorldPosition2d{x: world_coordinates.0, y: world_coordinates.1};
+        world_indices.push(world_point);
+    }
+
+    Some(world_indices)
+}
+
 #[derive(Copy, Clone, Hash, PartialEq, Eq)] 
-pub struct Position2d {
+struct Position2d {
     pub x: isize,
     pub y: isize,
 }
 
 
-pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) -> Option<Vec<Position2d>> {
+fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) -> Option<Vec<Position2d>> {
     let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
     let mut best_g_scores: HashMap<Position2d, f32> = HashMap::new();
     let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
@@ -59,7 +97,6 @@ pub fn plan_path(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) ->
     // Could not reach the goal
     None
 }
-
 
 
 #[derive(Copy, Clone)] 
@@ -168,7 +205,7 @@ mod tests {
             y: 2
         };
 
-        let path = plan_path(&occ_map, start_position, goal_position).expect("Should find a path here");
+        let path = plan_path_indices(&occ_map, start_position, goal_position).expect("Should find a path here");
         assert_eq!(path.len(), 5);
     }
 }

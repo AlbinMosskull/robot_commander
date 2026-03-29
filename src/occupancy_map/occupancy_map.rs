@@ -43,7 +43,13 @@ impl OccupancyMap {
         if !(self.is_within_bounds(x_idx, y_idx)) { return None; }
 
         Some((x_idx, y_idx))
+    }
 
+    pub fn convert_index_to_coordinate(&self, index_x: usize, index_y: usize) -> (f32, f32) {
+        let world_x = index_x as f32 * self.resolution + self.origin_x;
+        let world_y = index_y as f32 * self.resolution + self.origin_y;
+
+        (world_x, world_y)
     }
    
     pub fn ray_update(&mut self, start_world_x: f32, start_world_y: f32, end_world_x: f32, end_world_y: f32) {

@@ -4,9 +4,13 @@ mod path_planning;
 
 use pyo3::prelude::*;                                                      
 use occupancy_map::occupancy_map::OccupancyMap;
+use path_planning::a_star::WorldPosition2d;
+use path_planning::a_star::plan_path;
 
 #[pymodule]                                                                
 fn robot_commander(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<OccupancyMap>()?;                                        
+    m.add_class::<WorldPosition2d>()?;                                        
+    m.add_function(wrap_pyfunction!(plan_path, m)?)?;
     Ok(())      
 }
