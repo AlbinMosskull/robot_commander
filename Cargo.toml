@@ -3,5 +3,9 @@ name = "robot_commander"
 version = "0.1.0"
 edition = "2024"
 
+[lib]           
+crate-type = ["cdylib"]
+
 [dependencies]
 line_drawing = "0.4.0"
+pyo3 = { version = "0.23", features = ["extension-module"] }   
