@@ -1,9 +1,12 @@
+import math
+
 
 class Agent:
     def __init__(self, x, y, v):
         self.x = x
         self.y = y
         self.v = v
+        self.heading: float = math.pi / 2
 
     def move(self, goal_x, goal_y):
         error_x = goal_x - self.x
@@ -16,3 +19,4 @@ class Agent:
         v = min(self.v, distance)
         self.x += v * (error_x / distance)
         self.y += v * (error_y / distance)
+        self.heading = math.atan2(error_y, error_x)
