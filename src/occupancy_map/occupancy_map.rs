@@ -52,7 +52,7 @@ impl OccupancyMap {
         (world_x, world_y)
     }
    
-    pub fn ray_update(&mut self, start_world_x: f32, start_world_y: f32, end_world_x: f32, end_world_y: f32) {
+    pub fn ray_update(&mut self, start_world_x: f32, start_world_y: f32, end_world_x: f32, end_world_y: f32, did_collide: bool) {
         let start_grid_pos = self.convert_coordinate_to_index(start_world_x, start_world_y).expect("Start position must be within bounds");
         let end_grid_pos = self.convert_and_clip_coordinate_to_index(end_world_x, end_world_y);
 
@@ -64,8 +64,8 @@ impl OccupancyMap {
 
         for (x_idx, y_idx) in ray {                                                  
             let (x, y) = (x_idx as usize, y_idx as usize);
-            let did_collide = (x, y) == end_grid_pos;                                
-            self.update_cell(x, y, did_collide);     
+            let is_collision = (x, y) == end_grid_pos && did_collide;                                
+            self.update_cell(x, y, is_collision);     
         }     
     }
 
