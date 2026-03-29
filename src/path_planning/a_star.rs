@@ -25,14 +25,14 @@ impl WorldPosition2d {
 }
 
 #[pyfunction]
-pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d) -> Option<Vec<WorldPosition2d>> {
+pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d, collision_margin: f32) -> Option<Vec<WorldPosition2d>> {
     let start_tuple = occ_map.convert_coordinate_to_index(world_start.x, world_start.y)?;
     let goal_tuple = occ_map.convert_coordinate_to_index(world_goal.x, world_goal.y)?;
     
     let start = Position2d { x: start_tuple.0 as isize, y: start_tuple.1 as isize };
     let goal = Position2d { x: goal_tuple.0 as isize, y: goal_tuple.1 as isize };
 
-    let positions = plan_path_indices(occ_map, start, goal)?;
+    let positions = plan_path_indices(occ_map, start, goal, collision_margin)?;
     let mut world_indices: Vec<WorldPosition2d> = Vec::new();
     for position in positions {
         let world_coordinates = occ_map.convert_index_to_coordinate(position.x as usize, position.y as usize);
@@ -50,7 +50,7 @@ struct Position2d {
 }
 
 
-fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d) -> Option<Vec<Position2d>> {
+fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d, collision_margin: f32) -> Option<Vec<Position2d>> {
     let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
     let mut best_g_scores: HashMap<Position2d, f32> = HashMap::new();
     let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
@@ -77,7 +77,7 @@ fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d
             return Some(reconstruct_path(&came_from, current));
         }
 
-        let neighbors = get_neighbors(&occ_map, current);
+        let neighbors = get_neighbors(&occ_map, current, collision_margin);
         let tentative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1.0 being cost per edge
         for neighbor in neighbors {
             if tentative_g_cost < best_g_scores.get(&neighbor).copied().unwrap_or(f32::INFINITY) {
@@ -158,7 +158,7 @@ fn reconstruct_path(came_from: &HashMap<Position2d, Position2d>, final_position:
     full_path
 }
 
-fn get_neighbors(occ_map: &OccupancyMap, position: Position2d) -> Vec<Position2d> {
+fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin: f32) -> Vec<Position2d> {
     let mut neighbors = Vec::new();
     const ALLOWED_DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
     
@@ -169,7 +169,7 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d) -> Vec<Position2d
         };
 
         if let (Ok(x), Ok(y)) = (neighbor.x.try_into(),neighbor.y.try_into()) {                                         
-            if occ_map.is_valid_index(x, y) {
+            if occ_map.is_valid_index(x, y, collision_margin) {
                 println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
                 neighbors.push(neighbor);                                
             }           

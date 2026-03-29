@@ -69,14 +69,23 @@ impl OccupancyMap {
         }     
     }
 
-    pub fn is_valid_coordinate(&self, x: f32, y: f32) -> bool {
+    pub fn is_valid_coordinate(&self, x: f32, y: f32, collision_margin: f32) -> bool {
         self.convert_coordinate_to_index(x, y)
-            .map(|(x_idx, y_idx)| self.is_valid_index(x_idx, y_idx))
+            .map(|(x_idx, y_idx)| self.is_valid_index(x_idx, y_idx, collision_margin))
             .unwrap_or(false)
     }
 
-    pub fn is_valid_index(&self, x_idx: usize, y_idx: usize) -> bool {
-        self.is_within_bounds(x_idx, y_idx) && self.occupancy_prob_map[y_idx][x_idx] < DEFAULT_UNCERTAINTY
+    pub fn is_valid_index(&self, x_idx_to_check: usize, y_idx_to_check: usize, collision_margin: f32) -> bool {
+        let cells_to_check = (collision_margin / self.resolution) as usize + 1;
+
+        for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check {
+            for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check {
+                let is_valid = self.is_within_bounds(x_idx, y_idx) && self.occupancy_prob_map[y_idx][x_idx] < DEFAULT_UNCERTAINTY;
+                if !is_valid { return false; }
+            }
+        }
+
+        true
     }
 
     pub fn set_all_unoccupied(&mut self) {
