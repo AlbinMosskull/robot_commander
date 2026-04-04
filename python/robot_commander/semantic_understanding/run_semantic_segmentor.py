@@ -51,7 +51,7 @@ def _draw_instances(frame: np.ndarray, instances: list[SegmentationResult]) -> n
 def main():
     print("Loading Mask2Former instance segmentation model...")
     segmentor = SemanticSegmentor()
-    print(f"Model loaded. Press 'q' to quit.")
+    print("Model loaded. Press 'q' to quit.")
 
     with WebCamera() as cam:
         while True:

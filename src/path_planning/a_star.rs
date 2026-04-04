@@ -205,7 +205,7 @@ mod tests {
             y: 2
         };
 
-        let path = plan_path_indices(&occ_map, start_position, goal_position).expect("Should find a path here");
+        let path = plan_path_indices(&occ_map, start_position, goal_position, 0.0).expect("Should find a path here");
         assert_eq!(path.len(), 5);
     }
 }
