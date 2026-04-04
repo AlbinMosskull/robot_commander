@@ -4,23 +4,29 @@
 **Installation**
 ```git clone git@github.com:adeept/Adeept_RaspClaws-Metal.git```
 
+sudo apt install libxcb-cursor0
+
 ## Deploying the agent server to the Pi
 
 **On the Pi:**
 ```bash
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+source $HOME/.local/bin/env
 
-# Clone and install with agent dependencies only
+# Clone the repo
 git clone <repo-url>
 cd robot_commander
-pip install ".[agent]"
+
+# Create a virtual environment and install agent dependencies only
+uv venv
+source .venv/bin/activate
+uv sync --extra agent
 ```
 
 **Run the agent server:**
 ```bash
-python -m robot_commander.agent.agent_server
+uv run python -m robot_commander.agent.agent_server
 ```
 
 ### Calibration
