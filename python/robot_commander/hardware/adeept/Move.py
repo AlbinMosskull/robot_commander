@@ -10,7 +10,7 @@ from board import SCL, SDA
 import busio
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
-import Kalman_Filter as Kalman_filter
+from robot_commander.hardware.adeept import Kalman_Filter as Kalman_filter 
 from mpu6050 import mpu6050
 import json
 import copy

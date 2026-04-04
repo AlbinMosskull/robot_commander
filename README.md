@@ -18,7 +18,7 @@ git clone <repo-url>
 cd robot_commander
 
 # Install system dependencies (not available via pip)
-sudo apt-get install i2c-tools python3-smbus
+sudo apt-get install i2c-tools python3-smbus libcap-dev
 
 # Create a virtual environment and install agent dependencies only
 uv venv
