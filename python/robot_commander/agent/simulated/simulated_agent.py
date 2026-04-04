@@ -5,20 +5,19 @@ import time
 from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.agent.types import RangeReading
 from robot_commander.agent.simulated.agent import Agent
-from robot_commander.agent.simulated.ray_caster import cast_ray, _SWEEP_DEG, _SWEEP_DEG_PER_SEC
+from robot_commander.agent.simulated.sensors import SimulatedSensor, ConeSensor
 
 _TICK_HZ = 10
 
 
 class SimulatedAgent(AbstractAgent):
-    def __init__(self, start_x: float = 0.0, start_y: float = 0.0):
+    def __init__(self, start_x: float = 0.0, start_y: float = 0.0, sensor: SimulatedSensor | None = None):
         self._agent = Agent(x=start_x, y=start_y, v=0.05)
+        self._sensor = sensor if sensor is not None else ConeSensor()
         self._lock = threading.Lock()
         self._waypoints: list[tuple[float, float]] = []
         self._waypoint_idx: int = 0
-        self._ray: RangeReading | None = None
-        self._sweep_offset: float = -math.radians(_SWEEP_DEG / 2)
-        self._sweep_dir: float = 1.0
+        self._last_readings: list[RangeReading] = []
 
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
         self._tick_thread.start()
@@ -34,18 +33,9 @@ class SimulatedAgent(AbstractAgent):
                         if self._waypoint_idx >= len(self._waypoints):
                             self._waypoints = []
 
-                x, y = self._agent.x, self._agent.y
-                half_sweep = math.radians(_SWEEP_DEG / 2)
-                step = math.radians(_SWEEP_DEG_PER_SEC / _TICK_HZ)
-                self._sweep_offset += self._sweep_dir * step
-                if self._sweep_offset >= half_sweep:
-                    self._sweep_offset = half_sweep
-                    self._sweep_dir = -1.0
-                elif self._sweep_offset <= -half_sweep:
-                    self._sweep_offset = -half_sweep
-                    self._sweep_dir = 1.0
-                sx, sy, ex, ey, did_hit = cast_ray(x, y, self._agent.heading + self._sweep_offset)
-                self._ray = RangeReading(sx, sy, ex, ey, did_hit)
+                self._last_readings = self._sensor.read(
+                    self._agent.x, self._agent.y, self._agent.heading
+                )
 
             time.sleep(1 / _TICK_HZ)
 
@@ -63,9 +53,7 @@ class SimulatedAgent(AbstractAgent):
 
     def GetSensorReading(self) -> list[RangeReading]:
         with self._lock:
-            if self._ray is None:
-                return []
-            return [self._ray]
+            return list(self._last_readings)
 
     def GetCameraReading(self):
         return None
