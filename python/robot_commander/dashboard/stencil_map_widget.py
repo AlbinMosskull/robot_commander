@@ -60,8 +60,7 @@ class StencilMapWidget(QWidget):
             return
 
         # Map click position from widget coords to original frame pixel coords.
-        frame = self._controller.render()
-        frame_h, frame_w = frame.shape[:2]
+        frame_w, frame_h = self._controller.frame_size
         display_size = self._display.size()
 
         scale = min(display_size.width() / frame_w, display_size.height() / frame_h)
