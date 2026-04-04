@@ -3,6 +3,8 @@ images/
 calibration/
 plots/
 
+Adeept_RaspClaws-Metal/
+
 # Python
 .venv/
 __pycache__/

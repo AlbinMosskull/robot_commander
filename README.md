@@ -1,6 +1,10 @@
 # Robot Commander
 
 ## Setup
+**Installation**
+```git clone git@github.com:adeept/Adeept_RaspClaws-Metal.git```
+
+
 **Calibration - Intrinsics**
 The first step is to find the intrinsics of your camera.
 1. Print a checkerboard. You can find these from OpenCV, and print onto an A4 paper.
