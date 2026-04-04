@@ -67,18 +67,7 @@ def _gather_frames(cam: Camera, depth_processor: CalibratedDepthProcessor, local
     return frames, depth0
 
 
-def _main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--camera", type=str, default="webcam",
-                        help="Camera source: 'webcam' or path to an image file for testing.")
-    parser.add_argument("--plot_debug", action="store_true", help="Whether to save debug plots to disk.")
-    args = parser.parse_args()
-
-    cam = WebCamera() if args.camera == "webcam" else FromFileCamera(Path(args.camera))
-
-    _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
+def build_stencil_map(cam: Camera, plot_debug: bool = False) -> np.ndarray:
     print("Loading models...")
     intrinsics = cal.load()
     detector_model = TagDetector()
@@ -97,29 +86,23 @@ def _main():
     }
     print(f"  Detected classes: {list(frame_masks.keys())}")
 
-
-    do_plot = args.plot_debug
-    if do_plot:
+    if plot_debug:
         cv2.imwrite(str(_DEBUG_DIR / "01_frame.jpg"), frames[0])
-
         check_depth_and_save_vis(frames[0], depth0, _DEBUG_DIR / "02_depth.png")
-
         save_mask_vis(frames[0], frame_masks, _CLASS_COLORS_BGR, _DEBUG_DIR / "03_roi_masks.jpg")
-
 
     floor = detect_floor(depth0, intrinsics)
     if floor is None:
         raise SystemExit("Floor plane detection failed, cannot proceed.")
 
-    if do_plot:
+    if plot_debug:
         save_floor_vis(frames[0], depth0, floor, _DEBUG_DIR / "04_floor_ransac.jpg")
         check_tag_normals(localizer, frames[0], floor.normal)
 
     depths = [depth0] + [depth_processor.process(f) for f in frames[1:]]
     result: FootprintResult = build_footprints(depths, frame_masks, intrinsics, floor.normal, floor.distance)
-    np.savez(_DEBUG_DIR / "floor_basis.npz", u_vec=result.u_floor, v_vec=result.v_floor)
 
-    if do_plot:
+    if plot_debug:
         print(f"\n[PER-CLASS SURFACE]")
         for canonical, pts_3d in result.label_points.items():
             fname = f"05_{canonical.replace(' ', '_')}_surface.jpg"
@@ -130,7 +113,22 @@ def _main():
         print(f"\n[SHADOW] camera height: {abs(floor.distance):.3f} m  |  surface heights: "
             + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
 
-    stencil = draw_stencil_map(result.footprints, intrinsics, abs(floor.distance), result.surface_heights)
+    return W(result.footprints, intrinsics, abs(floor.distance), result.surface_heights)
+
+
+def _main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--camera", type=str, default="webcam",
+                        help="Camera source: 'webcam' or path to an image file for testing.")
+    parser.add_argument("--plot_debug", action="store_true", help="Whether to save debug plots to disk.")
+    args = parser.parse_args()
+
+    cam = WebCamera() if args.camera == "webcam" else FromFileCamera(Path(args.camera))
+
+    _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
+    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    stencil = build_stencil_map(cam, args.plot_debug)
     cv2.imwrite(str(_OUTPUT_DIR / "stencil_map.png"), stencil)
 
 
