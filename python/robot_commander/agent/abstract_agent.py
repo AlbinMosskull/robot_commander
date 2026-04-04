@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from robot_commander.agent.types import RangeReading
+from robot_commander.agent.data_types import RangeReading
 
 
 class AbstractAgent(ABC):

@@ -1,7 +1,7 @@
 import math
 from abc import ABC, abstractmethod
 
-from robot_commander.agent.types import RangeReading
+from robot_commander.agent.data_types import RangeReading
 from robot_commander.agent.simulated.ray_caster import cast_ray, _RAY_RANGE, _SWEEP_DEG, _SWEEP_DEG_PER_SEC
 
 _TICK_HZ = 10
