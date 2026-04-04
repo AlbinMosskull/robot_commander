@@ -110,7 +110,8 @@ def build_stencil_map(cam: Camera, plot_debug: bool = False) -> MapCoordinates:
             fname = f"05_{canonical.replace(' ', '_')}_surface.jpg"
             save_surface_vis(frames[0], pts_3d, intrinsics, canonical, _DEBUG_DIR / fname)
 
-        save_scatter(result.footprints, _DEBUG_DIR / "06_scatter.png")
+        # Currently not saving scatter, just for the later vis in the dashboard. Hacky solution.
+        # save_scatter(result.footprints, _DEBUG_DIR / "06_scatter.png")
 
         print(f"\n[SHADOW] camera height: {abs(floor.distance):.3f} m  |  surface heights: "
             + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
