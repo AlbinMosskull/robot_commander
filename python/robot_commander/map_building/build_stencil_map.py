@@ -115,6 +115,8 @@ def build_stencil_map(cam: Camera, plot_debug: bool = False) -> MapCoordinates:
         print(f"\n[SHADOW] camera height: {abs(floor.distance):.3f} m  |  surface heights: "
             + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
 
+    map_coords.u_floor = result.u_floor
+    map_coords.v_floor = result.v_floor
     map_coords.background = draw_stencil_map(result.footprints, intrinsics, abs(floor.distance), result.surface_heights, map_coords)
     return map_coords
 

@@ -7,6 +7,7 @@ import numpy as np
 
 from robot_commander import OccupancyMap, WorldPosition2d, plan_path
 from robot_commander.config import load as load_config
+from robot_commander.localization.world_localizer import WorldLocalizer
 from robot_commander.map_building.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
@@ -33,8 +34,9 @@ def _draw_occupancy_overlay(canvas: np.ndarray, occ_map: OccupancyMap) -> None:
 
 
 class StencilMapController:
-    def __init__(self, client: AgentClient | None):
+    def __init__(self, client: AgentClient | None, localizer: WorldLocalizer | None):
         self._client = client
+        self._localizer = localizer
 
         self._map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
@@ -58,30 +60,33 @@ class StencilMapController:
         self._pos_lock = threading.Lock()
         self._stop_event = threading.Event()
 
-        self._pos_thread: threading.Thread | None = None
         self._rays_thread: threading.Thread | None = None
 
     def start(self) -> None:
         if self._client is None:
             return
         self._stop_event.clear()
-        self._pos_thread = threading.Thread(target=self._stream_pos, daemon=True)
         self._rays_thread = threading.Thread(target=self._stream_rays, daemon=True)
-        self._pos_thread.start()
         self._rays_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
         if self._client is not None:
             self._client.close()
-        if self._pos_thread is not None:
-            self._pos_thread.join(timeout=2)
         if self._rays_thread is not None:
             self._rays_thread.join(timeout=2)
 
     @property
     def frame_size(self) -> tuple[int, int]:
         return self._map_coords.width_px, self._map_coords.height_px
+
+    def update(self, frame: np.ndarray) -> None:
+        if self._localizer is None:
+            return
+        pos = self._localizer.localize(frame)
+        if pos is not None:
+            with self._pos_lock:
+                self._agent_pos = pos
 
     def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool) -> None:
         wx, wy = self._map_coords.px_to_world(pixel_x, pixel_y)
@@ -133,18 +138,6 @@ class StencilMapController:
             cv2.circle(canvas, agent_px, 8, (0, 0, 0), 1)
 
         return canvas
-
-    def _stream_pos(self) -> None:
-        try:
-            for x, y in self._client.stream_positions():
-                if self._stop_event.is_set():
-                    break
-                with self._pos_lock:
-                    self._agent_pos = (x, y)
-                noisy_x, noisy_y = np.random.normal([x, y], scale=0.02)
-                self._client.observe_position(float(noisy_x), float(noisy_y), confidence=1.0)
-        except Exception:
-            traceback.print_exc()
 
     def _stream_rays(self) -> None:
         try:

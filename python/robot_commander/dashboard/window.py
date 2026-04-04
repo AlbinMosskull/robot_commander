@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 
 from pathlib import Path
 
+from robot_commander.agent.simulated.simulated_localizer import SimulatedLocalizer
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
 from robot_commander.dashboard.stencil_map_widget import StencilMapWidget
@@ -29,7 +30,8 @@ class DashboardWindow(QMainWindow):
         )
 
         self._client = _try_connect_client()
-        self._controller = StencilMapController(self._client)
+        localizer = SimulatedLocalizer(self._client) if self._client is not None else None
+        self._controller = StencilMapController(self._client, localizer)
 
         camera_pov = FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")
         camera_overhead = FromFileCamera(_EXAMPLE_INPUT / "scene_image.jpg")
@@ -48,7 +50,7 @@ class DashboardWindow(QMainWindow):
         main_layout.setContentsMargins(4, 4, 4, 4)
         main_layout.setSpacing(4)
 
-        self._stencil_widget = StencilMapWidget(self._controller)
+        self._stencil_widget = StencilMapWidget(self._controller, camera_overhead)
 
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)

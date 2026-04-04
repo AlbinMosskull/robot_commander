@@ -4,6 +4,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from robot_commander.image_processing.camera import Camera
 from robot_commander.remote_control.stencil_map_controller import StencilMapController
 
 
@@ -16,9 +17,10 @@ def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
 
 
 class StencilMapWidget(QWidget):
-    def __init__(self, controller: StencilMapController, parent=None):
+    def __init__(self, controller: StencilMapController, camera: Camera, parent=None):
         super().__init__(parent)
         self._controller = controller
+        self._camera = camera
         self.setStyleSheet("background-color: #0d0d0d;")
 
         layout = QVBoxLayout(self)
@@ -45,8 +47,12 @@ class StencilMapWidget(QWidget):
         self._timer.start(33)
 
     def _refresh(self) -> None:
-        frame = self._controller.render()
-        pixmap = _numpy_to_pixmap(frame)
+        ok, frame = self._camera.read()
+        if ok:
+            self._controller.update(frame)
+
+        canvas = self._controller.render()
+        pixmap = _numpy_to_pixmap(canvas)
         self._display.setPixmap(
             pixmap.scaled(
                 self._display.size(),
