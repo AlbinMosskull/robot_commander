@@ -2,9 +2,9 @@
 
 import math
 
-V_MAX_M_S = 0.5
-OMEGA_MAX_RAD_S = 2.0
-A_MAX_M_S2 = 1.0
+V_MAX_M_S = 0.15
+OMEGA_MAX_RAD_S = 3.5
+A_MAX_M_S2 = 2.0
 STEP_DURATION_S = 0.17
 WAYPOINT_THRESHOLD_M = 0.05  # arrival radius for waypoints
 
