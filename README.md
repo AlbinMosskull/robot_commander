@@ -1,9 +1,8 @@
 # Robot Commander
 
 ## Setup
-**Installation**
-```git clone git@github.com:adeept/Adeept_RaspClaws-Metal.git```
 
+On the desktop, I think
 sudo apt install libxcb-cursor0
 
 ## Deploying the agent server to the Pi
@@ -17,6 +16,9 @@ source $HOME/.local/bin/env
 # Clone the repo
 git clone <repo-url>
 cd robot_commander
+
+# Install system dependencies (not available via pip)
+sudo apt-get install i2c-tools python3-smbus
 
 # Create a virtual environment and install agent dependencies only
 uv venv

@@ -1,0 +1,4 @@
+{
+  "servo_angles": [90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90],
+  "comment": "Initial Angles of 16 Servos"
+}
