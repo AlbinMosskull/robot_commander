@@ -5,6 +5,7 @@ package agent;
 service AgentControl {
   rpc SetCheckpoint (Position) returns (Empty);
   rpc SetPath (Path) returns (Empty);
+  rpc ObservePosition (PositionObservation) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
   rpc StreamRays (Empty) returns (stream RayBatch);
 }
@@ -28,6 +29,12 @@ message Ray {
 
 message RayBatch {
   repeated Ray rays = 1;
+}
+
+message PositionObservation {
+  float x = 1;
+  float y = 2;
+  float confidence = 3;
 }
 
 message Empty {}

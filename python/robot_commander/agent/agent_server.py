@@ -23,6 +23,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         self._agent.SetWaypointList([(p.x, p.y) for p in request.waypoints])
         return agent_pb2.Empty()
 
+    def ObservePosition(self, request, context):
+        self._agent.ObservePosition(request.x, request.y, request.confidence)
+        return agent_pb2.Empty()
+
     def StreamPosition(self, request, context):
         while context.is_active():
             x, y = self._agent.GetXandY()

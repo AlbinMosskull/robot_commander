@@ -98,6 +98,8 @@ def main():
                     break
                 with pos_lock:
                     agent_pos = (x, y)
+                noisy_x, noisy_y = np.random.normal([x, y], scale=0.02)
+                client.observe_position(float(noisy_x), float(noisy_y), confidence=1.0)
         except Exception:
             pass
 

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from robot_commander.proto import agent_pb2 as robot__commander_dot_proto_dot_agent__pb2
+import agent_pb2 as agent__pb2
 
 GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in robot_commander/proto/agent_pb2_grpc.py depends on'
+        + ' but the generated code in agent_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,23 +36,28 @@ class AgentControlStub(object):
         """
         self.SetCheckpoint = channel.unary_unary(
                 '/agent.AgentControl/SetCheckpoint',
-                request_serializer=robot__commander_dot_proto_dot_agent__pb2.Position.SerializeToString,
-                response_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+                request_serializer=agent__pb2.Position.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
                 _registered_method=True)
         self.SetPath = channel.unary_unary(
                 '/agent.AgentControl/SetPath',
-                request_serializer=robot__commander_dot_proto_dot_agent__pb2.Path.SerializeToString,
-                response_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+                request_serializer=agent__pb2.Path.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
+                _registered_method=True)
+        self.ObservePosition = channel.unary_unary(
+                '/agent.AgentControl/ObservePosition',
+                request_serializer=agent__pb2.PositionObservation.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
                 _registered_method=True)
         self.StreamPosition = channel.unary_stream(
                 '/agent.AgentControl/StreamPosition',
-                request_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
-                response_deserializer=robot__commander_dot_proto_dot_agent__pb2.Position.FromString,
+                request_serializer=agent__pb2.Empty.SerializeToString,
+                response_deserializer=agent__pb2.Position.FromString,
                 _registered_method=True)
         self.StreamRays = channel.unary_stream(
                 '/agent.AgentControl/StreamRays',
-                request_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
-                response_deserializer=robot__commander_dot_proto_dot_agent__pb2.RayBatch.FromString,
+                request_serializer=agent__pb2.Empty.SerializeToString,
+                response_deserializer=agent__pb2.RayBatch.FromString,
                 _registered_method=True)
 
 
@@ -66,6 +71,12 @@ class AgentControlServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetPath(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ObservePosition(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -88,23 +99,28 @@ def add_AgentControlServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'SetCheckpoint': grpc.unary_unary_rpc_method_handler(
                     servicer.SetCheckpoint,
-                    request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Position.FromString,
-                    response_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
+                    request_deserializer=agent__pb2.Position.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
             ),
             'SetPath': grpc.unary_unary_rpc_method_handler(
                     servicer.SetPath,
-                    request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Path.FromString,
-                    response_serializer=robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
+                    request_deserializer=agent__pb2.Path.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
+            ),
+            'ObservePosition': grpc.unary_unary_rpc_method_handler(
+                    servicer.ObservePosition,
+                    request_deserializer=agent__pb2.PositionObservation.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
             ),
             'StreamPosition': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamPosition,
-                    request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
-                    response_serializer=robot__commander_dot_proto_dot_agent__pb2.Position.SerializeToString,
+                    request_deserializer=agent__pb2.Empty.FromString,
+                    response_serializer=agent__pb2.Position.SerializeToString,
             ),
             'StreamRays': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamRays,
-                    request_deserializer=robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
-                    response_serializer=robot__commander_dot_proto_dot_agent__pb2.RayBatch.SerializeToString,
+                    request_deserializer=agent__pb2.Empty.FromString,
+                    response_serializer=agent__pb2.RayBatch.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -132,8 +148,8 @@ class AgentControl(object):
             request,
             target,
             '/agent.AgentControl/SetCheckpoint',
-            robot__commander_dot_proto_dot_agent__pb2.Position.SerializeToString,
-            robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+            agent__pb2.Position.SerializeToString,
+            agent__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,
@@ -159,8 +175,35 @@ class AgentControl(object):
             request,
             target,
             '/agent.AgentControl/SetPath',
-            robot__commander_dot_proto_dot_agent__pb2.Path.SerializeToString,
-            robot__commander_dot_proto_dot_agent__pb2.Empty.FromString,
+            agent__pb2.Path.SerializeToString,
+            agent__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ObservePosition(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.AgentControl/ObservePosition',
+            agent__pb2.PositionObservation.SerializeToString,
+            agent__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,
@@ -186,8 +229,8 @@ class AgentControl(object):
             request,
             target,
             '/agent.AgentControl/StreamPosition',
-            robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
-            robot__commander_dot_proto_dot_agent__pb2.Position.FromString,
+            agent__pb2.Empty.SerializeToString,
+            agent__pb2.Position.FromString,
             options,
             channel_credentials,
             insecure,
@@ -213,8 +256,8 @@ class AgentControl(object):
             request,
             target,
             '/agent.AgentControl/StreamRays',
-            robot__commander_dot_proto_dot_agent__pb2.Empty.SerializeToString,
-            robot__commander_dot_proto_dot_agent__pb2.RayBatch.FromString,
+            agent__pb2.Empty.SerializeToString,
+            agent__pb2.RayBatch.FromString,
             options,
             channel_credentials,
             insecure,
