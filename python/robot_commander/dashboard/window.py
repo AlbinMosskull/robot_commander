@@ -4,11 +4,11 @@ from pathlib import Path
 
 from robot_commander.agent.simulated.simulated_localizer import SimulatedLocalizer
 from robot_commander.dashboard.camera_widget import CameraWidget
+from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
-from robot_commander.dashboard.stencil_map_widget import StencilMapWidget
 from robot_commander.image_processing.camera import FromFileCamera
 from robot_commander.remote_control.agent_client import AgentClient
-from robot_commander.remote_control.stencil_map_controller import StencilMapController
+from robot_commander.remote_control.controller import RemoteControl
 
 _EXAMPLE_INPUT = Path("images/example_input")
 
@@ -31,7 +31,7 @@ class DashboardWindow(QMainWindow):
 
         self._client = _try_connect_client()
         localizer = SimulatedLocalizer(self._client) if self._client is not None else None
-        self._controller = StencilMapController(self._client, localizer)
+        self._controller = RemoteControl(self._client, localizer)
 
         camera_pov = FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")
         camera_overhead = FromFileCamera(_EXAMPLE_INPUT / "scene_image.jpg")
@@ -50,7 +50,7 @@ class DashboardWindow(QMainWindow):
         main_layout.setContentsMargins(4, 4, 4, 4)
         main_layout.setSpacing(4)
 
-        self._stencil_widget = StencilMapWidget(self._controller, camera_overhead)
+        self._map_widget = MapWidget(self._controller, camera_overhead)
 
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
@@ -63,7 +63,7 @@ class DashboardWindow(QMainWindow):
         right_layout.addWidget(self._cam_pov_widget, stretch=1)
         right_layout.addWidget(self._cam_overhead_widget, stretch=1)
 
-        main_layout.addWidget(self._stencil_widget, stretch=3)
+        main_layout.addWidget(self._map_widget, stretch=3)
         main_layout.addWidget(right_panel, stretch=2)
 
         root_layout.addWidget(main_area, stretch=1)

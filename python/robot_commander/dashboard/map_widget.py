@@ -4,8 +4,9 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from robot_commander.dashboard.map_renderer import MapRenderer
 from robot_commander.image_processing.camera import Camera
-from robot_commander.remote_control.stencil_map_controller import StencilMapController
+from robot_commander.remote_control.controller import RemoteControl
 
 
 def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
@@ -16,11 +17,12 @@ def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
     return QPixmap.fromImage(image)
 
 
-class StencilMapWidget(QWidget):
-    def __init__(self, controller: StencilMapController, camera: Camera, parent=None):
+class MapWidget(QWidget):
+    def __init__(self, controller: RemoteControl, camera: Camera, parent=None):
         super().__init__(parent)
         self._controller = controller
         self._camera = camera
+        self._renderer = MapRenderer(controller.map_coords)
         self.setStyleSheet("background-color: #0d0d0d;")
 
         layout = QVBoxLayout(self)
@@ -51,10 +53,9 @@ class StencilMapWidget(QWidget):
         if ok:
             self._controller.update(frame)
 
-        canvas = self._controller.render()
-        pixmap = _numpy_to_pixmap(canvas)
+        canvas = self._renderer.render(self._controller.snapshot())
         self._display.setPixmap(
-            pixmap.scaled(
+            _numpy_to_pixmap(canvas).scaled(
                 self._display.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
@@ -65,7 +66,6 @@ class StencilMapWidget(QWidget):
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
-        # Map click position from widget coords to original frame pixel coords.
         frame_w, frame_h = self._controller.frame_size
         display_size = self._display.size()
 
@@ -73,16 +73,13 @@ class StencilMapWidget(QWidget):
         scaled_w = int(frame_w * scale)
         scaled_h = int(frame_h * scale)
 
-        # Offset of the scaled image within the QLabel (centered).
         offset_x = (display_size.width() - scaled_w) // 2
         offset_y = (display_size.height() - scaled_h) // 2
 
-        # Position relative to this widget, adjusted for the panel label height.
         label_height = 20
         click_x = event.position().x()
         click_y = event.position().y() - label_height
 
-        # Convert to frame pixel coords.
         frame_px_x = int((click_x - offset_x) / scale)
         frame_px_y = int((click_y - offset_y) / scale)
 
