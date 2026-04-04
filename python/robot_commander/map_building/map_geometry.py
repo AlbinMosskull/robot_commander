@@ -10,7 +10,7 @@ import numpy as np
 from robot_commander.image_processing import intrinsics as cal
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.ransac import detect_planes, Plane
-from robot_commander.map_building.map_coordinates import _MAP_H, _MAP_W, to_map_px
+from robot_commander.map_building.map_coordinates import MapCoordinates
 
 _MIN_OBJECT_HEIGHT = 0.10
 _MAX_OBJECT_HEIGHT = 1.50
@@ -52,15 +52,17 @@ def _filter_above_floor(
     return (heights > _MIN_OBJECT_HEIGHT) & (heights < _MAX_OBJECT_HEIGHT)
 
 
-def _largest_floor_component(pts: np.ndarray, u: np.ndarray, v: np.ndarray) -> np.ndarray:
+def _largest_floor_component(
+    pts: np.ndarray, u: np.ndarray, v: np.ndarray, map_coords: MapCoordinates
+) -> np.ndarray:
     """Return boolean mask keeping only the largest connected cluster in floor 2D space."""
     coords = to_floor_2d(pts, u, v)
-    px = to_map_px(coords)
+    px = map_coords.to_map_px(coords)
 
-    canvas = np.zeros((_MAP_H, _MAP_W), dtype=np.uint8)
+    canvas = np.zeros((map_coords.height_px, map_coords.width_px), dtype=np.uint8)
     valid = (
-        (px[:, 0] >= 0) & (px[:, 0] < _MAP_W) &
-        (px[:, 1] >= 0) & (px[:, 1] < _MAP_H)
+        (px[:, 0] >= 0) & (px[:, 0] < map_coords.width_px) &
+        (px[:, 1] >= 0) & (px[:, 1] < map_coords.height_px)
     )
     canvas[px[valid, 1], px[valid, 0]] = 1
 
@@ -108,6 +110,7 @@ def build_footprints(
     intrinsics: cal.Intrinsics,
     n_floor: np.ndarray,
     d_floor: float,
+    map_coords: MapCoordinates,
 ) -> FootprintResult:
     """Project segmented objects onto the floor plane across all frames."""
     u, v = _floor_basis(n_floor)
@@ -144,7 +147,7 @@ def build_footprints(
             if tilt <= _MAX_SURFACE_TILT_DEG:
                 filtered = filtered[planes[0].inliers]
 
-        comp_mask = _largest_floor_component(filtered, u, v)
+        comp_mask = _largest_floor_component(filtered, u, v, map_coords)
         filtered = filtered[comp_mask]
         if len(filtered) >= 3:
             class_2d[label] = to_floor_2d(filtered, u, v)

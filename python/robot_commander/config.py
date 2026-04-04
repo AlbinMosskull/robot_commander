@@ -34,11 +34,17 @@ class AgentConfig:
 
 
 @dataclass(frozen=True)
+class MapConfig:
+    stencil_path: Path
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig
     checkerboard: CheckerboardConfig
     tag: TagConfig
     agent: AgentConfig
+    map: MapConfig
 
 
 def load(path: Path = _CONFIG_PATH) -> Config:
@@ -64,5 +70,8 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         agent=AgentConfig(
             host=raw["agent"]["host"],
             port=raw["agent"]["port"],
+        ),
+        map=MapConfig(
+            stencil_path=Path(raw["map"]["stencil_path"]),
         ),
     )

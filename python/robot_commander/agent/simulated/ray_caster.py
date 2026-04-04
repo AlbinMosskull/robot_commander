@@ -4,7 +4,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander.map_building.map_coordinates import world_to_px, _MAP_W, _MAP_H
+from robot_commander.config import load as load_config
+from robot_commander.map_building.map_coordinates import MapCoordinates
+
+_map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
 _RAY_RANGE = 1.0
 _RAY_STEPS = 60
@@ -37,8 +40,8 @@ def cast_ray(x: float, y: float, angle: float) -> tuple[float, float, float, flo
         cy = y + t * sin_a
 
         if obstacles is not None:
-            px, py = world_to_px(cx, cy)
-            if 0 <= px < _MAP_W and 0 <= py < _MAP_H and obstacles[py, px] > 0:
+            px, py = _map_coords.world_to_px(cx, cy)
+            if 0 <= px < _map_coords.width_px and 0 <= py < _map_coords.height_px and obstacles[py, px] > 0:
                 return (x, y, cx, cy, True)
 
     return (x, y, x + _RAY_RANGE * cos_a, y + _RAY_RANGE * sin_a, False)

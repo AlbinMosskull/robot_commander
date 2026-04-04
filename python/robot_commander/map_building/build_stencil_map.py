@@ -16,6 +16,8 @@ from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.depth_processing.calibrated_depth_processor import CalibratedDepthProcessor
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
+from robot_commander.config import load as load_config
+from robot_commander.map_building.map_coordinates import MapCoordinates
 from robot_commander.map_building.map_drawing import draw_stencil_map
 from robot_commander.map_building.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
 from robot_commander.map_building.debug_map_building import (
@@ -29,7 +31,6 @@ from robot_commander.map_building.debug_map_building import (
 
 _cfg = load_config()
 _DEBUG_DIR = Path("plots/debug")
-_OUTPUT_DIR = Path("plots/output")
 
 _OBJECT_CLASSES: dict[str, str] = {
     "dining table": "dining table",
@@ -67,7 +68,7 @@ def _gather_frames(cam: Camera, depth_processor: CalibratedDepthProcessor, local
     return frames, depth0
 
 
-def build_stencil_map(cam: Camera, plot_debug: bool = False) -> np.ndarray:
+def build_stencil_map(cam: Camera, plot_debug: bool = False) -> MapCoordinates:
     print("Loading models...")
     intrinsics = cal.load()
     detector_model = TagDetector()
@@ -99,8 +100,9 @@ def build_stencil_map(cam: Camera, plot_debug: bool = False) -> np.ndarray:
         save_floor_vis(frames[0], depth0, floor, _DEBUG_DIR / "04_floor_ransac.jpg")
         check_tag_normals(localizer, frames[0], floor.normal)
 
+    map_coords = MapCoordinates.default()
     depths = [depth0] + [depth_processor.process(f) for f in frames[1:]]
-    result: FootprintResult = build_footprints(depths, frame_masks, intrinsics, floor.normal, floor.distance)
+    result: FootprintResult = build_footprints(depths, frame_masks, intrinsics, floor.normal, floor.distance, map_coords)
 
     if plot_debug:
         print(f"\n[PER-CLASS SURFACE]")
@@ -113,7 +115,8 @@ def build_stencil_map(cam: Camera, plot_debug: bool = False) -> np.ndarray:
         print(f"\n[SHADOW] camera height: {abs(floor.distance):.3f} m  |  surface heights: "
             + ", ".join(f"{k}: {v:.3f} m" for k, v in result.surface_heights.items()))
 
-    return W(result.footprints, intrinsics, abs(floor.distance), result.surface_heights)
+    map_coords.background = draw_stencil_map(result.footprints, intrinsics, abs(floor.distance), result.surface_heights, map_coords)
+    return map_coords
 
 
 def _main():
@@ -125,11 +128,12 @@ def _main():
 
     cam = WebCamera() if args.camera == "webcam" else FromFileCamera(Path(args.camera))
 
+    stencil_path = load_config().map.stencil_path
     _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    stencil_path.parent.mkdir(parents=True, exist_ok=True)
 
-    stencil = build_stencil_map(cam, args.plot_debug)
-    cv2.imwrite(str(_OUTPUT_DIR / "stencil_map.png"), stencil)
+    map_coords = build_stencil_map(cam, args.plot_debug)
+    map_coords.save(stencil_path)
 
 
 

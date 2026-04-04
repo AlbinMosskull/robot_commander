@@ -5,25 +5,12 @@ import cv2
 import numpy as np
 
 from robot_commander import OccupancyMap, WorldPosition2d, plan_path
-from robot_commander.map_building.map_coordinates import (
-    _MAP_H,
-    _MAP_W,
-    _MAP_ORIGIN,
-    _MAP_SCALE,
-    px_to_world,
-    world_to_px,
-)
+from robot_commander.config import load as load_config
+from robot_commander.map_building.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
 _PATH_COLLISION_MARGIN = 0.08
-
-_STENCIL_PATH = Path("plots/output/stencil_map.png")
-
 _OCC_RESOLUTION = 0.05
-_OCC_ORIGIN_X = -_MAP_ORIGIN[0] / _MAP_SCALE
-_OCC_ORIGIN_Y = (_MAP_ORIGIN[1] - _MAP_H) / _MAP_SCALE
-_OCC_WIDTH = round(_MAP_W / (_MAP_SCALE * _OCC_RESOLUTION))
-_OCC_HEIGHT = round(_MAP_H / (_MAP_SCALE * _OCC_RESOLUTION))
 
 _FREE_THRESHOLD = 0.3
 _OCCUPIED_THRESHOLD = 0.7
@@ -33,7 +20,7 @@ _OVERLAY_ALPHA = 0.45
 def _draw_occupancy_overlay(canvas: np.ndarray, occ_map: OccupancyMap) -> None:
     grid = np.array(occ_map.get_grid(), dtype=np.float32)
     grid = np.flipud(grid)
-    grid = cv2.resize(grid, (_MAP_W, _MAP_H), interpolation=cv2.INTER_NEAREST)
+    grid = cv2.resize(grid, (canvas.shape[1], canvas.shape[0]), interpolation=cv2.INTER_NEAREST)
 
     overlay = canvas.copy()
     overlay[grid < _FREE_THRESHOLD] = (0, 200, 0)
@@ -48,17 +35,19 @@ class StencilMapController:
     def __init__(self, client: AgentClient | None):
         self._client = client
 
-        if _STENCIL_PATH.exists():
-            self._background = cv2.imread(str(_STENCIL_PATH))
-        else:
-            self._background = np.full((_MAP_H, _MAP_W, 3), 30, dtype=np.uint8)
+        self._map_coords = MapCoordinates.load(load_config().map.stencil_path)
+
+        occ_origin_x = -self._map_coords.origin_px[0] / self._map_coords.scale_px_per_m
+        occ_origin_y = (self._map_coords.origin_px[1] - self._map_coords.height_px) / self._map_coords.scale_px_per_m
+        occ_width = round(self._map_coords.width_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
+        occ_height = round(self._map_coords.height_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
 
         self._occ_map = OccupancyMap(
-            width=_OCC_WIDTH,
-            height=_OCC_HEIGHT,
+            width=occ_width,
+            height=occ_height,
             resolution=_OCC_RESOLUTION,
-            origin_x=_OCC_ORIGIN_X,
-            origin_y=_OCC_ORIGIN_Y,
+            origin_x=occ_origin_x,
+            origin_y=occ_origin_y,
         )
         self._occ_lock = threading.Lock()
 
@@ -90,7 +79,7 @@ class StencilMapController:
             self._rays_thread.join(timeout=2)
 
     def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool) -> None:
-        wx, wy = px_to_world(pixel_x, pixel_y)
+        wx, wy = self._map_coords.px_to_world(pixel_x, pixel_y)
         if shift_held:
             with self._pos_lock:
                 start = self._agent_pos
@@ -115,26 +104,26 @@ class StencilMapController:
                 self._client.set_checkpoint(wx, wy)
 
     def render(self) -> np.ndarray:
-        canvas = self._background.copy()
+        canvas = self._map_coords.background.copy()
 
         with self._occ_lock:
             _draw_occupancy_overlay(canvas, self._occ_map)
 
         if self._planned_path:
-            pts = [world_to_px(wx, wy) for wx, wy in self._planned_path]
+            pts = [self._map_coords.world_to_px(wx, wy) for wx, wy in self._planned_path]
             for point_a, point_b in zip(pts, pts[1:]):
                 cv2.line(canvas, point_a, point_b, (0, 200, 0), 2)
             cv2.circle(canvas, pts[-1], 8, (0, 200, 0), -1)
             cv2.circle(canvas, pts[-1], 8, (0, 0, 0), 1)
         elif self._checkpoint is not None:
-            checkpoint_px = world_to_px(*self._checkpoint)
+            checkpoint_px = self._map_coords.world_to_px(*self._checkpoint)
             cv2.circle(canvas, checkpoint_px, 8, (0, 200, 0), -1)
             cv2.circle(canvas, checkpoint_px, 8, (0, 0, 0), 1)
 
         with self._pos_lock:
             pos = self._agent_pos
         if pos is not None:
-            agent_px = world_to_px(*pos)
+            agent_px = self._map_coords.world_to_px(*pos)
             cv2.circle(canvas, agent_px, 8, (200, 80, 0), -1)
             cv2.circle(canvas, agent_px, 8, (0, 0, 0), 1)
 

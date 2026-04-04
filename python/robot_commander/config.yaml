@@ -16,3 +16,6 @@ tag:
 agent:
   host: 192.168.0.43
   port: 50051
+
+map:
+  stencil_path: plots/output/stencil_map.json

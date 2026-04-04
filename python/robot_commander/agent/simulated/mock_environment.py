@@ -3,20 +3,22 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from robot_commander.map_building.map_coordinates import _MAP_W, _MAP_H
+from robot_commander.config import load as load_config
+from robot_commander.map_building.map_coordinates import MapCoordinates
 
-_STENCIL_PATH = Path("plots/output/stencil_map.png")
 _OBSTACLES_PATH = Path(__file__).parent / "obstacles.png"
 _OBSTACLE_RADIUS_PX = 10
 
 
 def main():
-    if not _STENCIL_PATH.exists():
-        print(f"Stencil map not found at {_STENCIL_PATH}. Run build_stencil_map.py first.")
+    stencil_path = load_config().map.stencil_path
+    if not stencil_path.exists():
+        print(f"Stencil map not found at {stencil_path}. Run build_stencil_map.py first.")
         return
 
-    background = cv2.imread(str(_STENCIL_PATH))
-    obstacles = np.zeros((_MAP_H, _MAP_W), dtype=np.uint8)
+    map_coords = MapCoordinates.load(stencil_path)
+    background = map_coords.background
+    obstacles = np.zeros((map_coords.height_px, map_coords.width_px), dtype=np.uint8)
 
     if _OBSTACLES_PATH.exists():
         loaded = cv2.imread(str(_OBSTACLES_PATH), cv2.IMREAD_GRAYSCALE)
