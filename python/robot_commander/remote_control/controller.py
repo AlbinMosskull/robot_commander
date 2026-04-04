@@ -12,6 +12,7 @@ from robot_commander.remote_control.agent_client import AgentClient
 
 _PATH_COLLISION_MARGIN = 0.08
 _OCC_RESOLUTION = 0.05
+LOCALIZATION_LOST_THRESHOLD = 30
 
 
 @dataclass
@@ -46,6 +47,7 @@ class RemoteControl:
         self._checkpoint: tuple[float, float] | None = None
         self._planned_path: list[tuple[float, float]] = []
         self._agent_pos: tuple[float, float] | None = None
+        self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
         self._pos_lock = threading.Lock()
         self._stop_event = threading.Event()
 
@@ -73,13 +75,23 @@ class RemoteControl:
         if self._rays_thread is not None:
             self._rays_thread.join(timeout=2)
 
+    @property
+    def localization_miss_count(self) -> int:
+        with self._pos_lock:
+            return self._localization_miss_count
+
     def update(self, frame: np.ndarray) -> None:
         if self._localizer is None:
             return
         pos = self._localizer.localize(frame)
-        if pos is not None:
-            with self._pos_lock:
+        with self._pos_lock:
+            if pos is not None:
                 self._agent_pos = pos
+                self._localization_miss_count = 0
+            else:
+                self._localization_miss_count = min(
+                    self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
+                )
 
     def snapshot(self) -> MapState:
         with self._pos_lock:

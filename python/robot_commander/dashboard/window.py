@@ -43,7 +43,7 @@ class DashboardWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        root_layout.addWidget(StatusBarWidget())
+        root_layout.addWidget(StatusBarWidget(self._controller))
 
         main_area = QWidget()
         main_layout = QHBoxLayout(main_area)
