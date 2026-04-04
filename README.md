@@ -4,7 +4,26 @@
 **Installation**
 ```git clone git@github.com:adeept/Adeept_RaspClaws-Metal.git```
 
+## Deploying the agent server to the Pi
 
+**On the Pi:**
+```bash
+# Install Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Clone and install with agent dependencies only
+git clone <repo-url>
+cd robot_commander
+pip install ".[agent]"
+```
+
+**Run the agent server:**
+```bash
+python -m robot_commander.agent.agent_server
+```
+
+### Calibration
 **Calibration - Intrinsics**
 The first step is to find the intrinsics of your camera.
 1. Print a checkerboard. You can find these from OpenCV, and print onto an A4 paper.
