@@ -2,6 +2,8 @@ import math
 import threading
 import time
 
+import numpy as np
+
 from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.agent.types import RangeReading
 from robot_commander.agent.simulated.motion_model import (
@@ -13,9 +15,26 @@ from robot_commander.agent.simulated.motion_model import (
     cardinal_direction,
 )
 from robot_commander.agent.simulated.sensors import SimulatedSensor, ConeSensor
+from robot_commander.filtering.kalman_filter import KalmanFilter
 
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
+
+# Simulated GPS noise standard deviation (meters)
+_GPS_NOISE_STD = 0.05
+
+
+def _make_position_filter(start_x: float, start_y: float) -> KalmanFilter:
+    I2 = np.eye(2)
+    return KalmanFilter(
+        F=I2,                               # Position doesn't self-evolve
+        B=I2,                               # Control input is displacement [dx, dy]
+        H=I2,                               # We measure position directly
+        Q=np.eye(2) * 1e-4,                 # Small process noise
+        R=np.eye(2) * _GPS_NOISE_STD**2,    # Measurement noise matches GPS std
+        x0=np.array([start_x, start_y]),
+        P0=I2,
+    )
 
 
 class SimulatedAgent(AbstractAgent):
@@ -29,6 +48,7 @@ class SimulatedAgent(AbstractAgent):
         self._committed_vx: float = 0.0
         self._committed_vy: float = 0.0
 
+        self._position_filter = _make_position_filter(start_x, start_y)
         self._sensor = sensor if sensor is not None else ConeSensor()
         self._lock = threading.Lock()
         self._waypoints: list[tuple[float, float]] = []
@@ -74,6 +94,12 @@ class SimulatedAgent(AbstractAgent):
                         if self._waypoint_idx >= len(self._waypoints):
                             self._waypoints = []
 
+                u = np.array([self._vx * _DT, self._vy * _DT])
+                self._position_filter.predict(u)
+
+                noisy_gps = np.array([self.x, self.y]) + np.random.normal(0, _GPS_NOISE_STD, 2)
+                self._position_filter.update(noisy_gps)
+
                 self._last_readings = self._sensor.read(self.x, self.y, self.heading)
 
             time.sleep(_DT)
@@ -85,7 +111,7 @@ class SimulatedAgent(AbstractAgent):
 
     def GetXandY(self) -> tuple[float, float]:
         with self._lock:
-            return self.x, self.y
+            return float(self._position_filter.x[0]), float(self._position_filter.x[1])
 
     def ObservePosition(self, x: float, y: float, confidence: float) -> None:
         pass  # Simulated agent has ground-truth position; no correction needed.
