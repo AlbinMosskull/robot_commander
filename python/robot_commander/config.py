@@ -29,6 +29,7 @@ class TagConfig:
 
 @dataclass(frozen=True)
 class AgentConfig:
+    host: str
     port: int
 
 
@@ -61,6 +62,7 @@ def load(path: Path = _CONFIG_PATH) -> Config:
             size_m=raw["tag"]["size_m"],
         ),
         agent=AgentConfig(
+            host=raw["agent"]["host"],
             port=raw["agent"]["port"],
         ),
     )

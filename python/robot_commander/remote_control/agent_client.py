@@ -5,7 +5,7 @@ from robot_commander import config as cfg
 
 
 class AgentClient:
-    def __init__(self, host: str = "localhost", port: int = cfg.load().agent.port):
+    def __init__(self, host: str = cfg.load().agent.host, port: int = cfg.load().agent.port):
         self._channel = grpc.insecure_channel(f"{host}:{port}")
         self._stub = agent_pb2_grpc.AgentControlStub(self._channel)
 
