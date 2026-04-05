@@ -4,25 +4,10 @@ use std::cmp::Ordering;
 use pyo3::prelude::*;
 
 use crate::occupancy_map::occupancy_map::OccupancyMap;
+use crate::occupancy_map::occupancy_map::Position2d;
 use crate::core::min_heap::MinHeap;
+use crate::core::geometry_types::WorldPosition2d;
 
-
-#[pyclass]
-#[derive(Copy, Clone)]
-pub struct WorldPosition2d {
-    #[pyo3(get)]
-    pub x: f32,
-    #[pyo3(get)]
-    pub y: f32,
-}
-
-#[pymethods]
-impl WorldPosition2d {
-    #[new]
-    pub fn new(x: f32, y: f32) -> Self {
-        WorldPosition2d { x, y }
-    }
-}
 
 #[pyfunction]
 pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d, collision_margin: f32) -> Option<Vec<WorldPosition2d>> {
@@ -41,12 +26,6 @@ pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goa
     }
 
     Some(world_indices)
-}
-
-#[derive(Copy, Clone, Hash, PartialEq, Eq)] 
-struct Position2d {
-    pub x: isize,
-    pub y: isize,
 }
 
 
@@ -168,12 +147,10 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin:
             y: position.y + dy,
         };
 
-        if let (Ok(x), Ok(y)) = (neighbor.x.try_into(),neighbor.y.try_into()) {                                         
-            if occ_map.is_valid_index(x, y, collision_margin) {
-                println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
-                neighbors.push(neighbor);                                
-            }           
-        }
+        if occ_map.is_valid_index(neighbor.x, neighbor.y, collision_margin) {
+            println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
+            neighbors.push(neighbor);                                
+        }           
     }
 
     neighbors

@@ -2,6 +2,16 @@ use line_drawing::bresenham;
 
 use pyo3::prelude::*;
 
+use crate::core::geometry_types::WorldPosition2d;
+
+
+// Position within the OccupancyMap grid
+#[derive(Copy, Clone, Hash, PartialEq, Eq)] 
+pub struct Position2d {
+    pub x: isize,
+    pub y: isize,
+}
+
 const DEFAULT_UNCERTAINTY: f32 = 0.5;
 const UPDATE_IF_COLLISION: f32 = 0.85;
 const UPDATE_IF_FREE: f32 = -0.5;
@@ -30,27 +40,6 @@ impl OccupancyMap {
             occupancy_prob_map: vec![vec![DEFAULT_UNCERTAINTY; width]; height],
         }
     }
-
-    pub fn convert_coordinate_to_index(&self, world_x: f32, world_y: f32) -> Option<(usize, usize)> {
-        let local_x = world_x - self.origin_x;
-        let local_y = world_y - self.origin_y;
-
-        if local_x < 0.0 || local_y < 0.0 { return None; }
-        
-        let x_idx = (local_x / self.resolution) as usize;
-        let y_idx = (local_y / self.resolution) as usize;
-
-        if !(self.is_within_bounds(x_idx, y_idx)) { return None; }
-
-        Some((x_idx, y_idx))
-    }
-
-    pub fn convert_index_to_coordinate(&self, index_x: usize, index_y: usize) -> (f32, f32) {
-        let world_x = index_x as f32 * self.resolution + self.origin_x;
-        let world_y = index_y as f32 * self.resolution + self.origin_y;
-
-        (world_x, world_y)
-    }
    
     pub fn ray_update(&mut self, start_world_x: f32, start_world_y: f32, end_world_x: f32, end_world_y: f32, did_collide: bool) {
         let start_grid_pos = self.convert_coordinate_to_index(start_world_x, start_world_y).expect("Start position must be within bounds");
@@ -71,21 +60,8 @@ impl OccupancyMap {
 
     pub fn is_valid_coordinate(&self, x: f32, y: f32, collision_margin: f32) -> bool {
         self.convert_coordinate_to_index(x, y)
-            .map(|(x_idx, y_idx)| self.is_valid_index(x_idx, y_idx, collision_margin))
+            .map(|(x_idx, y_idx)| self.is_valid_index(x_idx as isize, y_idx as isize, collision_margin))
             .unwrap_or(false)
-    }
-
-    pub fn is_valid_index(&self, x_idx_to_check: usize, y_idx_to_check: usize, collision_margin: f32) -> bool {
-        let cells_to_check = (collision_margin / self.resolution) as usize + 1;
-
-        for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check {
-            for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check {
-                let is_valid = self.is_within_bounds(x_idx, y_idx) && self.occupancy_prob_map[y_idx][x_idx] < DEFAULT_UNCERTAINTY;
-                if !is_valid { return false; }
-            }
-        }
-
-        true
     }
 
     pub fn set_all_unoccupied(&mut self) {
@@ -98,6 +74,44 @@ impl OccupancyMap {
 }
 
 impl OccupancyMap {
+    pub fn convert_coordinate_to_index(&self, world_x: f32, world_y: f32) -> Option<(usize, usize)> {
+        let local_x = world_x - self.origin_x;
+        let local_y = world_y - self.origin_y;
+
+        if local_x < 0.0 || local_y < 0.0 { return None; }
+        
+        let x_idx = (local_x / self.resolution) as usize;
+        let y_idx = (local_y / self.resolution) as usize;
+
+        if !(self.is_within_bounds(x_idx, y_idx)) { return None; }
+
+        Some((x_idx, y_idx))
+    }
+
+    pub fn convert_index_to_coordinate(&self, index_x: usize, index_y: usize) -> (f32, f32) {
+        let world_x = index_x as f32 * self.resolution + self.origin_x;
+        let world_y = index_y as f32 * self.resolution + self.origin_y;
+
+        (world_x, world_y)
+    }
+
+    pub fn is_valid_index(&self, x_idx_to_check: isize, y_idx_to_check: isize, collision_margin: f32) -> bool {
+        if x_idx_to_check < 0 || y_idx_to_check < 0 { return false; }
+        let x_idx_to_check = x_idx_to_check as usize;
+        let y_idx_to_check = y_idx_to_check as usize;
+
+        let cells_to_check = (collision_margin / self.resolution) as usize + 1;
+
+        for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check {
+            for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check {
+                let is_valid = self.is_within_bounds(x_idx, y_idx) && self.occupancy_prob_map[y_idx][x_idx] < DEFAULT_UNCERTAINTY;
+                if !is_valid { return false; }
+            }
+        }
+
+        true
+    }
+
     fn convert_and_clip_coordinate_to_index(&self, world_x: f32, world_y: f32) -> (usize, usize) {
         let local_x = (world_x - self.origin_x).max(0.0);
         let local_y = (world_y - self.origin_y).max(0.0);
@@ -123,7 +137,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn occupancy_map_basic_1() {
+    fn occupancy_map_coordinate_in_bounds() {
+        let occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        // assert_eq!(occ_map.convert_coordinate_to_index(0.05, 0.05), (0, 0));
+    }
+
+    #[test]
+    fn occupancy_map_basic_2() {
         let occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
     }
 

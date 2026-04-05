@@ -3,8 +3,8 @@ mod occupancy_map;
 mod path_planning;
 
 use pyo3::prelude::*;                                                      
+use core::geometry_types::WorldPosition2d;
 use occupancy_map::occupancy_map::OccupancyMap;
-use path_planning::a_star::WorldPosition2d;
 use path_planning::a_star::plan_path;
 
 #[pymodule]                                                                
