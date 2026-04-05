@@ -214,6 +214,35 @@ mod tests {
     }
 
     #[test]
+    fn towards_goal_reaches_goal_when_reachable() {
+        let occ_map = make_map(5, 5);
+        let path = plan_path_towards_goal_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 4, y: 4 }, 0.0);
+        assert_eq!(*path.last().unwrap(), Position2d { x: 4, y: 4 });
+    }
+
+    #[test]
+    fn towards_goal_ends_at_closest_reachable_node_when_goal_blocked() {
+        let mut occ_map = make_map(3, 3);
+        // Block all approaches to (2,2)
+        occ_map.update_cell(1, 2, true);
+        occ_map.update_cell(2, 1, true);
+        let path = plan_path_towards_goal_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 2, y: 2 }, 0.0);
+        // Best reachable node is (0,2) or (1,1) — both have Manhattan distance 2 from goal.
+        // Either way the path must not be empty and must not end at the blocked goal.
+        assert!(!path.is_empty());
+        assert_ne!(*path.last().unwrap(), Position2d { x: 2, y: 2 });
+        assert_eq!(heuristic_cost_to_go(*path.last().unwrap(), Position2d { x: 2, y: 2 }), 2.0);
+    }
+
+    #[test]
+    fn towards_goal_returns_single_node_when_start_equals_goal() {
+        let occ_map = make_map(5, 5);
+        let path = plan_path_towards_goal_indices(&occ_map, Position2d { x: 2, y: 2 }, Position2d { x: 2, y: 2 }, 0.0);
+        assert_eq!(path.len(), 1);
+        assert_eq!(path[0], Position2d { x: 2, y: 2 });
+    }
+
+    #[test]
     fn collision_margin_blocks_path_through_narrow_gap() {
         let mut occ_map = make_map(5, 3);
         // One-cell gap at (2,1) between obstacles at (2,0) and (2,2)
