@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 from robot_commander.remote_control.controller import LOCALIZATION_LOST_THRESHOLD, RemoteControl
 
@@ -38,12 +38,19 @@ class StatusBarWidget(QWidget):
             "color: #00ff88; font-family: monospace; font-size: 13px; font-weight: bold;"
         )
 
+        self._jam_button = QPushButton("JAM LOCALIZATION")
+        self._jam_button.setCheckable(True)
+        self._jam_button.setStyleSheet(self._jam_button_style(False))
+        self._jam_button.clicked.connect(self._on_jam_clicked)
+
         layout.addWidget(connection_label)
         layout.addWidget(self._status_value)
         layout.addSpacing(24)
         layout.addWidget(escape_plan_label)
         layout.addWidget(self._escape_plan_value)
         layout.addStretch()
+        layout.addWidget(self._jam_button)
+        layout.addSpacing(12)
         layout.addWidget(self._time_label)
 
         self._clock_timer = QTimer(self)
@@ -88,6 +95,20 @@ class StatusBarWidget(QWidget):
         self._escape_plan_value.setText(escape_text)
         self._escape_plan_value.setStyleSheet(
             f"color: {escape_color}; font-family: monospace; font-size: 13px; font-weight: bold;"
+        )
+
+    def _on_jam_clicked(self) -> None:
+        self._controller.toggle_localization_jam()
+        jammed = self._controller.localization_jammed
+        self._jam_button.setStyleSheet(self._jam_button_style(jammed))
+
+    @staticmethod
+    def _jam_button_style(active: bool) -> str:
+        bg = "#ff4444" if active else "#333333"
+        fg = "#ffffff" if active else "#aaaaaa"
+        return (
+            f"background-color: {bg}; color: {fg}; font-family: monospace; "
+            f"font-size: 12px; font-weight: bold; border: 1px solid #555555; padding: 2px 8px;"
         )
 
     def _update_time(self) -> None:

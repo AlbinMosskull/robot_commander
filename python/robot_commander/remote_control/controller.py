@@ -67,6 +67,7 @@ class RemoteControl:
         self._agent_pos: tuple[float, float] | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
         self._last_escape_plan_time: float | None = None
+        self._localization_jammed: bool = False
         self._pos_lock = threading.Lock()
         self._stop_event = threading.Event()
 
@@ -100,6 +101,18 @@ class RemoteControl:
             return self._localization_miss_count
 
     @property
+    def connection_lost(self) -> bool:
+        with self._pos_lock:
+            return self._localization_miss_count >= LOCALIZATION_LOST_THRESHOLD
+
+    @property
+    def localization_jammed(self) -> bool:
+        return self._localization_jammed
+
+    def toggle_localization_jam(self) -> None:
+        self._localization_jammed = not self._localization_jammed
+
+    @property
     def escape_plan_age_s(self) -> float | None:
         with self._pos_lock:
             if self._last_escape_plan_time is None:
@@ -109,7 +122,7 @@ class RemoteControl:
     def update(self, frame: np.ndarray) -> None:
         if self._localizer is None:
             return
-        pos = self._localizer.localize(frame)
+        pos = None if self._localization_jammed else self._localizer.localize(frame)
         with self._pos_lock:
             if pos is not None:
                 self._agent_pos = pos
@@ -138,6 +151,8 @@ class RemoteControl:
         )
 
     def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool) -> None:
+        if self.connection_lost:
+            return
         wx, wy = self._map_coords.px_to_world(pixel_x, pixel_y)
         if shift_held:
             with self._pos_lock:
@@ -190,6 +205,8 @@ class RemoteControl:
             for rays in self._client.stream_rays():
                 if self._stop_event.is_set():
                     break
+                if self.connection_lost:
+                    continue
                 with self._occ_lock:
                     for sx, sy, ex, ey, did_collide in rays:
                         try:
