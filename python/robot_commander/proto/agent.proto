@@ -5,6 +5,7 @@ package agent;
 service AgentControl {
   rpc SetCheckpoint (Position) returns (Empty);
   rpc SetPath (Path) returns (Empty);
+  rpc SetEscapePlan (Path) returns (Empty);
   rpc ObservePosition (PositionObservation) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
   rpc StreamRays (Empty) returns (stream RayBatch);

@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from robot_commander.proto import agent_pb2 as agent__pb2
+import agent_pb2 as agent__pb2
 
 GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
@@ -44,6 +44,11 @@ class AgentControlStub(object):
                 request_serializer=agent__pb2.Path.SerializeToString,
                 response_deserializer=agent__pb2.Empty.FromString,
                 _registered_method=True)
+        self.SetEscapePlan = channel.unary_unary(
+                '/agent.AgentControl/SetEscapePlan',
+                request_serializer=agent__pb2.Path.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
+                _registered_method=True)
         self.ObservePosition = channel.unary_unary(
                 '/agent.AgentControl/ObservePosition',
                 request_serializer=agent__pb2.PositionObservation.SerializeToString,
@@ -71,6 +76,12 @@ class AgentControlServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetPath(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetEscapePlan(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -104,6 +115,11 @@ def add_AgentControlServicer_to_server(servicer, server):
             ),
             'SetPath': grpc.unary_unary_rpc_method_handler(
                     servicer.SetPath,
+                    request_deserializer=agent__pb2.Path.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
+            ),
+            'SetEscapePlan': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetEscapePlan,
                     request_deserializer=agent__pb2.Path.FromString,
                     response_serializer=agent__pb2.Empty.SerializeToString,
             ),
@@ -175,6 +191,33 @@ class AgentControl(object):
             request,
             target,
             '/agent.AgentControl/SetPath',
+            agent__pb2.Path.SerializeToString,
+            agent__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetEscapePlan(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.AgentControl/SetEscapePlan',
             agent__pb2.Path.SerializeToString,
             agent__pb2.Empty.FromString,
             options,

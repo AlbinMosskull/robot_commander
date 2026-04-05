@@ -92,6 +92,16 @@ class RemoteControl:
                 self._localization_miss_count = min(
                     self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
                 )
+        if pos is not None and self._client is not None:
+            with self._occ_lock:
+                escape_path = plan_path(
+                    self._occ_map,
+                    WorldPosition2d(pos[0], pos[1]),
+                    WorldPosition2d(0.0, 0.0),
+                    _PATH_COLLISION_MARGIN,
+                )
+            if escape_path is not None:
+                self._client.set_escape_plan([(point.x, point.y) for point in escape_path])
 
     def snapshot(self) -> MapState:
         with self._pos_lock:

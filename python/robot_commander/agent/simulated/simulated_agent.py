@@ -19,6 +19,7 @@ from robot_commander.filtering.kalman_filter import KalmanFilter
 
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
+_REMOTE_TIMEOUT_S = 5.0
 
 # Simulated GPS noise standard deviation (meters)
 _GPS_NOISE_STD = 0.05
@@ -55,8 +56,26 @@ class SimulatedAgent(AbstractAgent):
         self._waypoint_idx: int = 0
         self._last_readings: list[RangeReading] = []
 
+        self._last_remote_message_time: float = time.time()
+        self._escape_plan: list[tuple[float, float]] = []
+        self._escape_plan_idx: int = 0
+
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
         self._tick_thread.start()
+
+    def _notify_remote_message(self) -> None:
+        self._last_remote_message_time = time.time()
+
+    def _follow_waypoints(self, waypoints: list[tuple[float, float]], idx: int) -> tuple[list[tuple[float, float]], int]:
+        if not waypoints:
+            return waypoints, idx
+        wx, wy = waypoints[idx]
+        self._move(wx, wy)
+        if math.hypot(self.x - wx, self.y - wy) < WAYPOINT_THRESHOLD_M:
+            idx += 1
+            if idx >= len(waypoints):
+                return [], 0
+        return waypoints, idx
 
     def _move(self, goal_x: float, goal_y: float) -> None:
         distance = math.hypot(goal_x - self.x, goal_y - self.y)
@@ -86,13 +105,10 @@ class SimulatedAgent(AbstractAgent):
     def _tick_loop(self):
         while True:
             with self._lock:
-                if self._waypoints:
-                    wx, wy = self._waypoints[self._waypoint_idx]
-                    self._move(wx, wy)
-                    if math.hypot(self.x - wx, self.y - wy) < WAYPOINT_THRESHOLD_M:
-                        self._waypoint_idx += 1
-                        if self._waypoint_idx >= len(self._waypoints):
-                            self._waypoints = []
+                if time.time() - self._last_remote_message_time > _REMOTE_TIMEOUT_S and self._escape_plan:
+                    self._escape_plan, self._escape_plan_idx = self._follow_waypoints(self._escape_plan, self._escape_plan_idx)
+                else:
+                    self._waypoints, self._waypoint_idx = self._follow_waypoints(self._waypoints, self._waypoint_idx)
 
                 u = np.array([self._vx * _DT, self._vy * _DT])
                 self._position_filter.predict(u)
@@ -108,13 +124,20 @@ class SimulatedAgent(AbstractAgent):
         with self._lock:
             self._waypoints = list(waypoints)
             self._waypoint_idx = 0
+        self._notify_remote_message()
+
+    def SetEscapePlan(self, waypoints: list[tuple[float, float]]) -> None:
+        with self._lock:
+            self._escape_plan = list(waypoints)
+            self._escape_plan_idx = 0
+        self._notify_remote_message()
 
     def GetXandY(self) -> tuple[float, float]:
         with self._lock:
             return float(self._position_filter.x[0]), float(self._position_filter.x[1])
 
     def ObservePosition(self, x: float, y: float, confidence: float) -> None:
-        pass  # Simulated agent has ground-truth position; no correction needed.
+        self._notify_remote_message()  # Simulated agent has ground-truth position; no correction needed.
 
     def GetSensorReading(self) -> list[RangeReading]:
         with self._lock:

@@ -23,6 +23,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         self._agent.SetWaypointList([(p.x, p.y) for p in request.waypoints])
         return agent_pb2.Empty()
 
+    def SetEscapePlan(self, request, context):
+        self._agent.SetEscapePlan([(p.x, p.y) for p in request.waypoints])
+        return agent_pb2.Empty()
+
     def ObservePosition(self, request, context):
         self._agent.ObservePosition(request.x, request.y, request.confidence)
         return agent_pb2.Empty()
