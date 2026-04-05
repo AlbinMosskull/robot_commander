@@ -11,21 +11,11 @@ use crate::core::geometry_types::WorldPosition2d;
 
 #[pyfunction]
 pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d, collision_margin: f32) -> Option<Vec<WorldPosition2d>> {
-    let start_tuple = occ_map.convert_coordinate_to_index(world_start.x, world_start.y)?;
-    let goal_tuple = occ_map.convert_coordinate_to_index(world_goal.x, world_goal.y)?;
-    
-    let start = Position2d { x: start_tuple.0 as isize, y: start_tuple.1 as isize };
-    let goal = Position2d { x: goal_tuple.0 as isize, y: goal_tuple.1 as isize };
+    let start = occ_map.convert_coordinate_to_index(world_start.x, world_start.y)?;
+    let goal = occ_map.convert_coordinate_to_index(world_goal.x, world_goal.y)?;
 
     let positions = plan_path_indices(occ_map, start, goal, collision_margin)?;
-    let mut world_indices: Vec<WorldPosition2d> = Vec::new();
-    for position in positions {
-        let world_coordinates = occ_map.convert_index_to_coordinate(position.x as usize, position.y as usize);
-        let world_point = WorldPosition2d{x: world_coordinates.0, y: world_coordinates.1};
-        world_indices.push(world_point);
-    }
-
-    Some(world_indices)
+    Some(positions.into_iter().map(|p| occ_map.convert_index_to_coordinate(p)).collect())
 }
 
 
@@ -147,9 +137,9 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin:
             y: position.y + dy,
         };
 
-        if occ_map.is_valid_index(neighbor.x, neighbor.y, collision_margin) {
+        if occ_map.is_valid_index(neighbor, collision_margin) {
             println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
-            neighbors.push(neighbor);                                
+            neighbors.push(neighbor);
         }           
     }
 

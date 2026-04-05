@@ -45,22 +45,20 @@ impl OccupancyMap {
         let start_grid_pos = self.convert_coordinate_to_index(start_world_x, start_world_y).expect("Start position must be within bounds");
         let end_grid_pos = self.convert_and_clip_coordinate_to_index(end_world_x, end_world_y);
 
-        // bresenham returns an iterator that yields every (x, y) coordinate on the line.
-        let ray = bresenham(                                                    
-            (start_grid_pos.0 as isize, start_grid_pos.1 as isize),                  
-            (end_grid_pos.0 as isize, end_grid_pos.1 as isize),    
+        let ray = bresenham(
+            (start_grid_pos.x, start_grid_pos.y),
+            (end_grid_pos.x, end_grid_pos.y),
         );
 
-        for (x_idx, y_idx) in ray {                                                  
-            let (x, y) = (x_idx as usize, y_idx as usize);
-            let is_collision = (x, y) == end_grid_pos && did_collide;                                
-            self.update_cell(x, y, is_collision);     
-        }     
+        for (x_idx, y_idx) in ray {
+            let is_collision = (x_idx, y_idx) == (end_grid_pos.x, end_grid_pos.y) && did_collide;
+            self.update_cell(x_idx as usize, y_idx as usize, is_collision);
+        }
     }
 
     pub fn is_valid_coordinate(&self, x: f32, y: f32, collision_margin: f32) -> bool {
         self.convert_coordinate_to_index(x, y)
-            .map(|(x_idx, y_idx)| self.is_valid_index(x_idx as isize, y_idx as isize, collision_margin))
+            .map(|position| self.is_valid_index(position, collision_margin))
             .unwrap_or(false)
     }
 
@@ -74,31 +72,31 @@ impl OccupancyMap {
 }
 
 impl OccupancyMap {
-    pub fn convert_coordinate_to_index(&self, world_x: f32, world_y: f32) -> Option<(usize, usize)> {
+    pub fn convert_coordinate_to_index(&self, world_x: f32, world_y: f32) -> Option<Position2d> {
         let local_x = world_x - self.origin_x;
         let local_y = world_y - self.origin_y;
 
         if local_x < 0.0 || local_y < 0.0 { return None; }
-        
+
         let x_idx = (local_x / self.resolution) as usize;
         let y_idx = (local_y / self.resolution) as usize;
 
         if !(self.is_within_bounds(x_idx, y_idx)) { return None; }
 
-        Some((x_idx, y_idx))
+        Some(Position2d { x: x_idx as isize, y: y_idx as isize })
     }
 
-    pub fn convert_index_to_coordinate(&self, index_x: usize, index_y: usize) -> (f32, f32) {
-        let world_x = index_x as f32 * self.resolution + self.origin_x;
-        let world_y = index_y as f32 * self.resolution + self.origin_y;
-
-        (world_x, world_y)
+    pub fn convert_index_to_coordinate(&self, position: Position2d) -> WorldPosition2d {
+        WorldPosition2d {
+            x: position.x as f32 * self.resolution + self.origin_x,
+            y: position.y as f32 * self.resolution + self.origin_y,
+        }
     }
 
-    pub fn is_valid_index(&self, x_idx_to_check: isize, y_idx_to_check: isize, collision_margin: f32) -> bool {
-        if x_idx_to_check < 0 || y_idx_to_check < 0 { return false; }
-        let x_idx_to_check = x_idx_to_check as usize;
-        let y_idx_to_check = y_idx_to_check as usize;
+    pub fn is_valid_index(&self, position: Position2d, collision_margin: f32) -> bool {
+        if position.x < 0 || position.y < 0 { return false; }
+        let x_idx_to_check = position.x as usize;
+        let y_idx_to_check = position.y as usize;
 
         let cells_to_check = (collision_margin / self.resolution) as usize + 1;
 
@@ -112,14 +110,14 @@ impl OccupancyMap {
         true
     }
 
-    fn convert_and_clip_coordinate_to_index(&self, world_x: f32, world_y: f32) -> (usize, usize) {
+    fn convert_and_clip_coordinate_to_index(&self, world_x: f32, world_y: f32) -> Position2d {
         let local_x = (world_x - self.origin_x).max(0.0);
         let local_y = (world_y - self.origin_y).max(0.0);
 
-        let x_idx = ((local_x / self.resolution) as usize).min(self.width);
-        let y_idx = ((local_y / self.resolution) as usize).min(self.height);
-
-        (x_idx, y_idx)
+        Position2d {
+            x: ((local_x / self.resolution) as usize).min(self.width) as isize,
+            y: ((local_y / self.resolution) as usize).min(self.height) as isize,
+        }
     }
     
     fn update_cell(&mut self, x_idx: usize, y_idx: usize, did_collide: bool) {
