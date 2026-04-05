@@ -18,8 +18,22 @@ pub fn plan_path(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goa
     Some(positions.into_iter().map(|p| occ_map.convert_index_to_coordinate(p)).collect())
 }
 
+#[pyfunction]
+pub fn plan_path_towards_goal(occ_map: &OccupancyMap, world_start: WorldPosition2d, world_goal: WorldPosition2d, collision_margin: f32) -> Vec<WorldPosition2d> {
+    let start = occ_map.convert_coordinate_to_index(world_start.x, world_start.y).expect("Must give a position within world bounds");
+    let goal = occ_map.convert_coordinate_to_index(world_goal.x, world_goal.y).expect("Must give a position within world bounds");
+
+    let positions = plan_path_towards_goal_indices(occ_map, start, goal, collision_margin);
+    positions.into_iter().map(|p| occ_map.convert_index_to_coordinate(p)).collect()
+}
 
 fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d, collision_margin: f32) -> Option<Vec<Position2d>> {
+    let result = plan_path_towards_goal_indices(occ_map, start, goal, collision_margin);
+    (result.last() == Some(&goal)).then_some(result)
+}
+
+
+fn plan_path_towards_goal_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d, collision_margin: f32) -> Vec<Position2d> {
     let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
     let mut best_g_scores: HashMap<Position2d, f32> = HashMap::new();
     let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
@@ -41,7 +55,7 @@ fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d
         }
 
         if current == goal {
-            return Some(reconstruct_path(&came_from, current));
+            return reconstruct_path(&came_from, current);
         }
 
         let neighbors = get_neighbors(&occ_map, current, collision_margin);
@@ -61,8 +75,11 @@ fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d
         }
     }
 
-    // Could not reach the goal
-    None
+    // Could not reach the goal. Return the point closest to the goal
+    let closest_to_goal = *best_g_scores.keys().min_by(|a, b| {
+        heuristic_cost_to_go(**a, goal).partial_cmp(&heuristic_cost_to_go(**b, goal))
+        .unwrap()}).expect("The best_g_scores should never be empty, start is always added");
+    reconstruct_path(&came_from, closest_to_goal)
 }
 
 
