@@ -98,12 +98,16 @@ impl OccupancyMap {
         let x_idx_to_check = position.x as usize;
         let y_idx_to_check = position.y as usize;
 
-        let cells_to_check = (collision_margin / self.resolution) as usize + 1;
+        let cells_to_check = if collision_margin > 0.0 {
+            (collision_margin / self.resolution) as usize + 1                                              
+        } else {
+            0  // Zero margin should entail only one cell checked.                                                                                    
+        };
 
-        for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check {
-            for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check {
-                let is_valid = self.is_within_bounds(x_idx, y_idx) && self.occupancy_prob_map[y_idx][x_idx] < DEFAULT_UNCERTAINTY;
-                if !is_valid { return false; }
+        for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check+1 {
+            for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check+1 {
+                if !self.is_within_bounds(x_idx, y_idx) { continue; }
+                if self.occupancy_prob_map[y_idx][x_idx] >= DEFAULT_UNCERTAINTY { return false; }
             }
         }
 
@@ -153,6 +157,18 @@ mod tests {
         assert_eq!(occ_map.convert_coordinate_to_index(1.00, 2.00), Some(Position2d { x: 0, y: 0 }));
         assert_eq!(occ_map.convert_coordinate_to_index(1.05, 2.05), Some(Position2d { x: 0, y: 0 }));
         assert_eq!(occ_map.convert_coordinate_to_index(0.9, 2.0), None);
+    }
+
+    #[test]
+    fn is_valid_index_detects_collision_exactly_on_positive_side_of_margin() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        occ_map.set_all_unoccupied();
+        occ_map.update_cell(2, 0, true);
+        // collision_margin=0.1, resolution=0.1, should check 2 cells, so (2,0) should be within margin
+        let border_resolution = 0.1;
+        let under_resolution = 0.1 - 1e-3;
+        assert!(occ_map.is_valid_coordinate(0.05, 0.05, under_resolution));
+        assert!(!occ_map.is_valid_coordinate(0.05, 0.05, border_resolution));
     }
 
     #[test]
