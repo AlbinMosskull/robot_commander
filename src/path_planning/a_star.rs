@@ -36,8 +36,6 @@ fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d
         let costed_current = open_set.extract_min().expect("While loop checks for empty");
         let current = costed_current.position;
 
-        println!("Investigating position {} {}", current.x, current.y);
-
         if costed_current.g_cost > best_g_scores.get(&current).copied().expect("Should always have a value") {
             continue;  // A better path to the node has already been added, so we do not need to explore this one.
         }
@@ -138,7 +136,6 @@ fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin:
         };
 
         if occ_map.is_valid_index(neighbor, collision_margin) {
-            println!("Adding neighbor with coords {}, {}", neighbor.x, neighbor.y);
             neighbors.push(neighbor);
         }           
     }

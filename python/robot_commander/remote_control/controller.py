@@ -2,6 +2,7 @@ import threading
 import time
 import traceback
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -11,9 +12,11 @@ from robot_commander.localization.world_localizer import WorldLocalizer
 from robot_commander.map_building.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
-_PATH_COLLISION_MARGIN = 0.08
+_PATH_COLLISION_MARGIN = 0.07
 _OCC_RESOLUTION = 0.05
 LOCALIZATION_LOST_THRESHOLD = 30
+_ESCAPE_POSITION = (0.1, 0.2)
+_FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 
 
 @dataclass
@@ -21,6 +24,17 @@ class MapState:
     agent_pos: tuple[float, float] | None
     planned_path: list[tuple[float, float]]
     checkpoint: tuple[float, float] | None
+    occ_grid: np.ndarray = field(repr=False)
+
+
+@dataclass
+class PlanPathFailure:
+    start: WorldPosition2d
+    goal: WorldPosition2d
+    collision_margin: float
+    resolution: float
+    origin_x: float
+    origin_y: float
     occ_grid: np.ndarray = field(repr=False)
 
 
@@ -36,12 +50,15 @@ class RemoteControl:
         occ_width = round(self._map_coords.width_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
         occ_height = round(self._map_coords.height_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
 
+        self._occ_resolution = _OCC_RESOLUTION
+        self._occ_origin_x = occ_origin_x
+        self._occ_origin_y = occ_origin_y
         self._occ_map = OccupancyMap(
             width=occ_width,
             height=occ_height,
-            resolution=_OCC_RESOLUTION,
-            origin_x=occ_origin_x,
-            origin_y=occ_origin_y,
+            resolution=self._occ_resolution,
+            origin_x=self._occ_origin_x,
+            origin_y=self._occ_origin_y,
         )
         self._occ_lock = threading.Lock()
 
@@ -102,15 +119,9 @@ class RemoteControl:
                     self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
                 )
         if pos is not None and self._client is not None:
-            with self._occ_lock:
-                escape_path = plan_path(
-                    self._occ_map,
-                    WorldPosition2d(pos[0], pos[1]),
-                    WorldPosition2d(0.0, 0.0),
-                    _PATH_COLLISION_MARGIN,
-                )
+            escape_path = self._plan_path(WorldPosition2d(pos[0], pos[1]), WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz")
             if escape_path is not None:
-                self._client.set_escape_plan([(point.x, point.y) for point in escape_path])
+                self._client.set_escape_plan(escape_path)
                 with self._pos_lock:
                     self._last_escape_plan_time = time.monotonic()
 
@@ -133,16 +144,10 @@ class RemoteControl:
                 start = self._agent_pos
             if start is None or self._client is None:
                 return
-            with self._occ_lock:
-                result = plan_path(
-                    self._occ_map,
-                    WorldPosition2d(start[0], start[1]),
-                    WorldPosition2d(wx, wy),
-                    _PATH_COLLISION_MARGIN,
-                )
+            result = self._plan_path(WorldPosition2d(start[0], start[1]), WorldPosition2d(wx, wy), "user_path.npz")
             if result is None:
                 return
-            self._planned_path = [(point.x, point.y) for point in result]
+            self._planned_path = result
             self._checkpoint = None
             self._client.set_path(self._planned_path)
         else:
@@ -150,6 +155,35 @@ class RemoteControl:
             self._planned_path = []
             if self._client is not None:
                 self._client.set_checkpoint(wx, wy)
+
+    def _plan_path(self, start: WorldPosition2d, goal: WorldPosition2d, failure_filename: str) -> list[tuple[float, float]] | None:
+        with self._occ_lock:
+            result = plan_path(self._occ_map, start, goal, _PATH_COLLISION_MARGIN)
+            if result is None:
+                failure = PlanPathFailure(
+                    start=start,
+                    goal=goal,
+                    collision_margin=_PATH_COLLISION_MARGIN,
+                    resolution=self._occ_resolution,
+                    origin_x=self._occ_origin_x,
+                    origin_y=self._occ_origin_y,
+                    occ_grid=np.array(self._occ_map.get_grid(), dtype=np.float32),
+                )
+        if result is None:
+            _FAILURES_DIR.mkdir(exist_ok=True)
+            save_path = _FAILURES_DIR / failure_filename
+            np.savez(
+                save_path,
+                occ_grid=failure.occ_grid,
+                start=np.array([failure.start.x, failure.start.y]),
+                goal=np.array([failure.goal.x, failure.goal.y]),
+                collision_margin=np.array([failure.collision_margin]),
+                resolution=np.array([failure.resolution]),
+                origin=np.array([failure.origin_x, failure.origin_y]),
+            )
+            print(f"Path planning failed: {failure.start=} {failure.goal=} saved to {save_path}")
+            return None
+        return [(point.x, point.y) for point in result]
 
     def _stream_rays(self) -> None:
         try:
