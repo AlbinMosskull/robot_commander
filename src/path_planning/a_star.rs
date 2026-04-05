@@ -159,20 +159,53 @@ fn heuristic_cost_to_go(current: Position2d, goal: Position2d) -> f32 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn basic_test_1(){
-        let mut occ_map = OccupancyMap::new(3, 3, 0.1, 0.0, 0.0);
+    fn make_map(width: usize, height: usize) -> OccupancyMap {
+        let mut occ_map = OccupancyMap::new(width, height, 0.1, 0.0, 0.0);
         occ_map.set_all_unoccupied();
-        let start_position = Position2d {
-            x: 0,
-            y: 0
-        };
-        let goal_position = Position2d {
-            x: 2,
-            y: 2
-        };
+        occ_map
+    }
 
-        let path = plan_path_indices(&occ_map, start_position, goal_position, 0.0).expect("Should find a path here");
+    #[test]
+    fn finds_path_in_open_space() {
+        let occ_map = make_map(3, 3);
+        let path = plan_path_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 2, y: 2 }, 0.0).expect("Should find a path");
         assert_eq!(path.len(), 5);
+    }
+
+    #[test]
+    fn start_equals_goal_returns_single_node_path() {
+        let occ_map = make_map(5, 5);
+        let path = plan_path_indices(&occ_map, Position2d { x: 2, y: 2 }, Position2d { x: 2, y: 2 }, 0.0).expect("Should find a path");
+        assert_eq!(path.len(), 1);
+    }
+
+    #[test]
+    fn path_routes_around_obstacle() {
+        let mut occ_map = make_map(5, 3);
+        // Wall at x=2 blocking rows y=0 and y=1, leaving y=2 as the only passage
+        occ_map.update_cell(2, 0, true);
+        occ_map.update_cell(2, 1, true);
+        let path = plan_path_indices(&occ_map, Position2d { x: 0, y: 1 }, Position2d { x: 4, y: 1 }, 0.0).expect("Should route around obstacle");
+        assert_eq!(path.len(), 7);
+    }
+
+    #[test]
+    fn returns_none_when_goal_is_unreachable() {
+        let mut occ_map = make_map(3, 3);
+        // Block all approaches to (2,2)
+        occ_map.update_cell(1, 2, true);
+        occ_map.update_cell(2, 1, true);
+        let path = plan_path_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 2, y: 2 }, 0.0);
+        assert!(path.is_none());
+    }
+
+    #[test]
+    fn collision_margin_blocks_path_through_narrow_gap() {
+        let mut occ_map = make_map(5, 3);
+        // One-cell gap at (2,1) between obstacles at (2,0) and (2,2)
+        occ_map.update_cell(2, 0, true);
+        occ_map.update_cell(2, 2, true);
+        assert!(plan_path_indices(&occ_map, Position2d { x: 0, y: 1 }, Position2d { x: 4, y: 1 }, 0.0).is_some());
+        assert!(plan_path_indices(&occ_map, Position2d { x: 0, y: 1 }, Position2d { x: 4, y: 1 }, 0.05).is_none());
     }
 }

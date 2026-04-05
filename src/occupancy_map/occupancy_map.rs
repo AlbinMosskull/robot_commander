@@ -97,6 +97,7 @@ impl OccupancyMap {
         if position.x < 0 || position.y < 0 { return false; }
         let x_idx_to_check = position.x as usize;
         let y_idx_to_check = position.y as usize;
+        if !self.is_within_bounds(x_idx_to_check, y_idx_to_check) { return false; }
 
         let cells_to_check = if collision_margin > 0.0 {
             (collision_margin / self.resolution) as usize + 1                                              
@@ -106,6 +107,9 @@ impl OccupancyMap {
 
         for x_idx in x_idx_to_check.saturating_sub(cells_to_check)..x_idx_to_check+cells_to_check+1 {
             for y_idx in y_idx_to_check.saturating_sub(cells_to_check)..y_idx_to_check+cells_to_check+1 {
+                let dx = x_idx as isize - x_idx_to_check as isize;
+                let dy = y_idx as isize - y_idx_to_check as isize;
+                if dx * dx + dy * dy > (cells_to_check * cells_to_check) as isize { continue; }
                 if !self.is_within_bounds(x_idx, y_idx) { continue; }
                 if self.occupancy_prob_map[y_idx][x_idx] >= DEFAULT_UNCERTAINTY { return false; }
             }
@@ -124,7 +128,7 @@ impl OccupancyMap {
         }
     }
     
-    fn update_cell(&mut self, x_idx: usize, y_idx: usize, did_collide: bool) {
+    pub(crate) fn update_cell(&mut self, x_idx: usize, y_idx: usize, did_collide: bool) {
         let prob_update = if did_collide {UPDATE_IF_COLLISION} else {UPDATE_IF_FREE};
         self.occupancy_prob_map[y_idx][x_idx] += prob_update;
     }
@@ -178,6 +182,15 @@ mod tests {
         let grid = occ_map.get_grid();
         assert!(grid[3][0] > DEFAULT_UNCERTAINTY, "Collision cell should be above default uncertainty");
         assert!(grid[0][0] < DEFAULT_UNCERTAINTY, "Free cells along ray should be below default uncertainty");
+    }
+
+    #[test]
+    fn is_valid_index_margin_is_circular_not_square() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        occ_map.set_all_unoccupied();
+        // Index (2,2) is distance sqrt(8) ~= 2.83 from (0,0), which is outside a circle of radius 2 but inside the square
+        occ_map.update_cell(2, 2, true);
+        assert!(occ_map.is_valid_coordinate(0.05, 0.05, 0.1));
     }
 
     #[test]
