@@ -1,25 +1,6 @@
 from robot_commander import OccupancyMap
 
 
-def test_construct():
-    OccupancyMap(width=10, height=10, resolution=0.1, origin_x=0.0, origin_y=0.0)
-
-
-def test_coordinate_in_bounds():
-    m = OccupancyMap(width=10, height=10, resolution=0.1, origin_x=0.0, origin_y=0.0)
-    assert m.convert_coordinate_to_index(0.05, 0.05) == (0, 0)
-
-
-def test_coordinate_out_of_bounds_returns_none():
-    m = OccupancyMap(width=10, height=10, resolution=0.1, origin_x=0.0, origin_y=0.0)
-    assert m.convert_coordinate_to_index(5.0, 5.0) is None
-
-
-def test_coordinate_negative_returns_none():
-    m = OccupancyMap(width=10, height=10, resolution=0.1, origin_x=0.0, origin_y=0.0)
-    assert m.convert_coordinate_to_index(-0.1, 0.0) is None
-
-
 def test_is_valid_coordinate_unknown_by_default():
     m = OccupancyMap(width=10, height=10, resolution=0.1, origin_x=0.0, origin_y=0.0)
     assert not m.is_valid_coordinate(0.05, 0.05, 0.0)

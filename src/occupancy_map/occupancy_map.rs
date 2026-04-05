@@ -6,7 +6,7 @@ use crate::core::geometry_types::WorldPosition2d;
 
 
 // Position within the OccupancyMap grid
-#[derive(Copy, Clone, Hash, PartialEq, Eq)] 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Position2d {
     pub x: isize,
     pub y: isize,
@@ -135,14 +135,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn occupancy_map_coordinate_in_bounds() {
+    fn convert_coordinate_to_index_maps_correctly() {
         let occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
-        // assert_eq!(occ_map.convert_coordinate_to_index(0.05, 0.05), (0, 0));
+        assert_eq!(occ_map.convert_coordinate_to_index(0.05, 0.15), Some(Position2d { x: 0, y: 1 }));
     }
 
     #[test]
-    fn occupancy_map_basic_2() {
+    fn convert_coordinate_to_index_returns_none_outside_bounds() {
         let occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        assert_eq!(occ_map.convert_coordinate_to_index(-0.1, 0.0), None);
+        assert_eq!(occ_map.convert_coordinate_to_index(0.0, 1.1), None);
     }
 
+    #[test]
+    fn convert_coordinate_to_index_respects_origin() {
+        let occ_map = OccupancyMap::new(10, 10, 0.1, 1.0, 2.0);
+        assert_eq!(occ_map.convert_coordinate_to_index(1.00, 2.00), Some(Position2d { x: 0, y: 0 }));
+        assert_eq!(occ_map.convert_coordinate_to_index(1.05, 2.05), Some(Position2d { x: 0, y: 0 }));
+        assert_eq!(occ_map.convert_coordinate_to_index(0.9, 2.0), None);
+    }
+
+    #[test]
+    fn ray_update_marks_collision_cell_as_occupied() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        occ_map.ray_update(0.05, 0.05, 0.05, 0.35, true);
+        let grid = occ_map.get_grid();
+        assert!(grid[3][0] > DEFAULT_UNCERTAINTY, "Collision cell should be above default uncertainty");
+        assert!(grid[0][0] < DEFAULT_UNCERTAINTY, "Free cells along ray should be below default uncertainty");
+    }
+
+    #[test]
+    fn is_valid_coordinate_false_after_collision() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        occ_map.ray_update(0.05, 0.05, 0.05, 0.35, true);
+        assert!(!occ_map.is_valid_coordinate(0.05, 0.35, 0.0));
+        assert!(occ_map.is_valid_coordinate(0.05, 0.05, 0.0));
+    }
 }
