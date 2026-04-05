@@ -1,4 +1,5 @@
 import threading
+import time
 import traceback
 from dataclasses import dataclass, field
 
@@ -48,6 +49,7 @@ class RemoteControl:
         self._planned_path: list[tuple[float, float]] = []
         self._agent_pos: tuple[float, float] | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
+        self._last_escape_plan_time: float | None = None
         self._pos_lock = threading.Lock()
         self._stop_event = threading.Event()
 
@@ -80,6 +82,13 @@ class RemoteControl:
         with self._pos_lock:
             return self._localization_miss_count
 
+    @property
+    def escape_plan_age_s(self) -> float | None:
+        with self._pos_lock:
+            if self._last_escape_plan_time is None:
+                return None
+            return time.monotonic() - self._last_escape_plan_time
+
     def update(self, frame: np.ndarray) -> None:
         if self._localizer is None:
             return
@@ -102,6 +111,8 @@ class RemoteControl:
                 )
             if escape_path is not None:
                 self._client.set_escape_plan([(point.x, point.y) for point in escape_path])
+                with self._pos_lock:
+                    self._last_escape_plan_time = time.monotonic()
 
     def snapshot(self) -> MapState:
         with self._pos_lock:

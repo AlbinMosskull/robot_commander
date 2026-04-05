@@ -30,8 +30,19 @@ class StatusBarWidget(QWidget):
         self._time_label.setStyleSheet("color: #cccccc; font-family: monospace; font-size: 13px;")
         self._time_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
+        escape_plan_label = QLabel("Escape plan:")
+        escape_plan_label.setStyleSheet("color: #aaaaaa; font-family: monospace; font-size: 13px;")
+
+        self._escape_plan_value = QLabel()
+        self._escape_plan_value.setStyleSheet(
+            "color: #00ff88; font-family: monospace; font-size: 13px; font-weight: bold;"
+        )
+
         layout.addWidget(connection_label)
         layout.addWidget(self._status_value)
+        layout.addSpacing(24)
+        layout.addWidget(escape_plan_label)
+        layout.addWidget(self._escape_plan_value)
         layout.addStretch()
         layout.addWidget(self._time_label)
 
@@ -59,6 +70,24 @@ class StatusBarWidget(QWidget):
         self._status_value.setText(text)
         self._status_value.setStyleSheet(
             f"color: {color}; font-family: monospace; font-size: 13px; font-weight: bold;"
+        )
+
+        age = self._controller.escape_plan_age_s
+        if age is None:
+            escape_text = "NONE"
+            escape_color = "#ff4444"
+        elif age < 2.0:
+            escape_text = f"{age:.1f}s ago"
+            escape_color = "#00ff88"
+        elif age < 5.0:
+            escape_text = f"{age:.1f}s ago"
+            escape_color = "#ffaa00"
+        else:
+            escape_text = f"STALE ({age:.0f}s)"
+            escape_color = "#ff4444"
+        self._escape_plan_value.setText(escape_text)
+        self._escape_plan_value.setStyleSheet(
+            f"color: {escape_color}; font-family: monospace; font-size: 13px; font-weight: bold;"
         )
 
     def _update_time(self) -> None:
