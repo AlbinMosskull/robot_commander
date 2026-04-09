@@ -5,6 +5,8 @@ plots/
 python/robot_commander/debug_tools/failures/
 
 Adeept_RaspClaws-Metal/
+# Need to fix this image a bit first
+python/robot_commander/depth_processing/tests/test_data/
 
 # Python
 .venv/

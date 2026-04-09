@@ -41,3 +41,11 @@ The first step is to find the intrinsics of your camera.
 
 **Calibration - depth**
 Get two april tags, and put them in the scene. One should lay flat against the floor. And the other at a position with lower depth.
+
+
+### Conventions
+Transforms should be named like camera_T_sensor and be 4x4
+
+
+
+
