@@ -2,8 +2,57 @@ import math
 
 import numpy as np
 
+from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
+from robot_commander.depth_processing.ransac import detect_planes, Plane
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.sensor.range_reading import RangeReading
+
+_MIN_OBSTACLE_HEIGHT_M = 0.05
+_RANSAC_ITERATIONS = 500
+_RANSAC_DISTANCE_THRESHOLD_M = 0.03
+
+
+def _detect_floor(points: np.ndarray) -> Plane | None:
+    planes = detect_planes(points, n_planes=1, n_iterations=_RANSAC_ITERATIONS, distance_threshold=_RANSAC_DISTANCE_THRESHOLD_M)
+    if not planes:
+        return None
+    floor = planes[0]
+    if floor.distance > 0:
+        floor = Plane(-floor.normal, -floor.distance, floor.inliers)
+    return floor
+
+
+def _floor_plane_basis(floor_normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    right = np.array([1.0, 0.0, 0.0])
+    right = right - (right @ floor_normal) * floor_normal
+    if np.linalg.norm(right) < 1e-6:
+        right = np.array([0.0, 0.0, 1.0])
+        right = right - (right @ floor_normal) * floor_normal
+    right /= np.linalg.norm(right)
+    forward = np.cross(floor_normal, right)
+    return right, forward
+
+
+def _slices_to_rays(
+    azimuths: np.ndarray,
+    horizontal_distances: np.ndarray,
+    slice_edges: np.ndarray,
+    agent_x: float,
+    agent_y: float,
+    agent_heading: float,
+) -> list[RangeReading]:
+    rays = []
+    for i in range(len(slice_edges) - 1):
+        in_slice = (azimuths >= slice_edges[i]) & (azimuths < slice_edges[i + 1])
+        if not in_slice.any():
+            continue
+        distance = float(horizontal_distances[in_slice].min())
+        slice_azimuth = (slice_edges[i] + slice_edges[i + 1]) / 2.0
+        world_bearing = agent_heading - slice_azimuth
+        end_x = agent_x + distance * math.cos(world_bearing)
+        end_y = agent_y + distance * math.sin(world_bearing)
+        rays.append(RangeReading(agent_x, agent_y, end_x, end_y, did_hit=True))
+    return rays
 
 
 def depth_to_rays(
@@ -12,30 +61,30 @@ def depth_to_rays(
     agent_x: float,
     agent_y: float,
     agent_heading: float,
+    max_obstacle_height_m: float = 1.5,
     num_slices: int = 30,
-    vertical_band_fraction: float = 0.2,
 ) -> list[RangeReading]:
-    height, width = calibrated_depth.shape
-    row_lo = int(height / 2 - height * vertical_band_fraction / 2)
-    row_hi = int(height / 2 + height * vertical_band_fraction / 2)
-    band = calibrated_depth[row_lo:row_hi, :]
+    points = depth_image_to_point_cloud(calibrated_depth, intrinsics)
+    if len(points) < 3:
+        return []
 
-    rays = []
-    for i in range(num_slices):
-        col_lo = i * width // num_slices
-        col_hi = (i + 1) * width // num_slices
-        slice_depths = band[:, col_lo:col_hi]
-        valid = slice_depths[slice_depths > 0]
-        if valid.size == 0:
-            continue
+    floor = _detect_floor(points)
+    if floor is None:
+        return []
 
-        d = float(valid.min())
-        col_center = (col_lo + col_hi) / 2
-        theta_cam = math.atan2((col_center - intrinsics.cx) / intrinsics.fx, 1.0)
-        horiz_dist = d * math.cos(theta_cam)
-        theta_world = agent_heading + theta_cam
-        end_x = agent_x + horiz_dist * math.cos(theta_world)
-        end_y = agent_y + horiz_dist * math.sin(theta_world)
-        rays.append(RangeReading(agent_x, agent_y, end_x, end_y, did_hit=True))
+    heights = points @ floor.normal - floor.distance
+    valid = points[(heights > _MIN_OBSTACLE_HEIGHT_M) & (heights < max_obstacle_height_m)]
+    if len(valid) == 0:
+        return []
 
-    return rays
+    right, forward = _floor_plane_basis(floor.normal)
+    rights = valid @ right
+    forwards = valid @ forward
+    azimuths = np.arctan2(rights, forwards)
+    horizontal_distances = np.sqrt(rights ** 2 + forwards ** 2)
+
+    width = calibrated_depth.shape[1]
+    half_fov = math.atan(width / (2.0 * intrinsics.fx))
+    slice_edges = np.linspace(-half_fov, half_fov, num_slices + 1)
+
+    return _slices_to_rays(azimuths, horizontal_distances, slice_edges, agent_x, agent_y, agent_heading)
