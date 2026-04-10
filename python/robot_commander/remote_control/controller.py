@@ -13,7 +13,7 @@ from robot_commander.depth_processing.cone_depth_processor import ConeDepthProce
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.localization.world_localizer import WorldLocalizer
-from robot_commander.map_building.map_coordinates import MapCoordinates
+from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
 _PATH_COLLISION_MARGIN = 0.07

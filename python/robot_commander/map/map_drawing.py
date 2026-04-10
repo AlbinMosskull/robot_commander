@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 from robot_commander.image_processing import intrinsics as cal
-from robot_commander.map_building.map_coordinates import MapCoordinates
+from robot_commander.map.map_coordinates import MapCoordinates
 
 
 def _shadow_polygon(

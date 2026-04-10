@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from robot_commander.map_building.map_coordinates import MapCoordinates
+from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.controller import MapState
 
 _FREE_THRESHOLD = 0.3

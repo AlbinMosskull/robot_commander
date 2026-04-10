@@ -2,7 +2,7 @@ import numpy as np
 
 from robot_commander.localization.localizer import Localizer
 from robot_commander.localization.world_localizer import WorldLocalizer
-from robot_commander.map_building.map_coordinates import MapCoordinates
+from robot_commander.map.map_coordinates import MapCoordinates
 
 
 class CameraLocalizer(WorldLocalizer):

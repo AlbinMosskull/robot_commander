@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 
 from pathlib import Path
 
-from robot_commander.agent.simulated.simulated_localizer import SimulatedLocalizer
+from robot_commander.localization.simulated_localizer import SimulatedLocalizer
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget

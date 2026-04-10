@@ -17,10 +17,10 @@ from robot_commander.depth_processing.calibrated_depth_processor import Calibrat
 from robot_commander.localization.localizer import Localizer
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
 from robot_commander.config import load as load_config
-from robot_commander.map_building.map_coordinates import MapCoordinates
-from robot_commander.map_building.map_drawing import draw_stencil_map
-from robot_commander.map_building.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
-from robot_commander.map_building.debug_map_building import (
+from robot_commander.map.map_coordinates import MapCoordinates
+from robot_commander.map.map_drawing import draw_stencil_map
+from robot_commander.map.map_geometry import FootprintResult, to_floor_2d, build_footprints, detect_floor
+from robot_commander.map.debug_map_building import (
     check_depth_and_save_vis,
     save_mask_vis,
     save_scatter,

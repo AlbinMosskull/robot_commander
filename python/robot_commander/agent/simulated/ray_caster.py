@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 
 from robot_commander.config import load as load_config
-from robot_commander.map_building.map_coordinates import MapCoordinates
+from robot_commander.map.map_coordinates import MapCoordinates
 
 _map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
