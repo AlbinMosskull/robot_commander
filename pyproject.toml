@@ -44,6 +44,10 @@ remote-station = [
     "transformers>=5.3.0",
 ]
 
+[project.scripts]
+agent-server = "robot_commander.agent.agent_server:main"
+remote-control = "robot_commander.remote_control.run_remote_control:main"
+
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
