@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from robot_commander.agent.data_types import RangeReading
+from robot_commander.sensor.range_reading import RangeReading
 
 
 class AbstractAgent(ABC):
@@ -21,3 +21,9 @@ class AbstractAgent(ABC):
 
     @abstractmethod
     def GetCameraReading(self): ...
+
+    @abstractmethod
+    def GetHeading(self) -> float: ...
+
+    @abstractmethod
+    def GetUltrasonicMin(self) -> float | None: ...

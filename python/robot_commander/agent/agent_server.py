@@ -1,6 +1,7 @@
 import time
 from concurrent import futures
 
+import cv2
 import grpc
 
 from robot_commander.agent.abstract_agent import AbstractAgent
@@ -37,18 +38,41 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
             yield agent_pb2.Position(x=x, y=y)
             time.sleep(1 / _STREAM_HZ)
 
-    def StreamRays(self, request, context):
+    def StreamAgentUpdate(self, request, context):
         while context.is_active():
-            readings = self._agent.GetSensorReading()
-            if readings:
-                yield agent_pb2.RayBatch(rays=[
-                    agent_pb2.Ray(
-                        start_x=r.start_x, start_y=r.start_y,
-                        end_x=r.end_x, end_y=r.end_y,
-                        did_collide=r.did_hit,
+            frame = self._agent.GetCameraReading()
+            camera_frame_jpg = b""
+            if frame is not None:
+                ok, buf = cv2.imencode(".jpg", frame)
+                if ok:
+                    camera_frame_jpg = buf.tobytes()
+
+            ultrasonic_min = self._agent.GetUltrasonicMin()
+            if ultrasonic_min is not None:
+                yield agent_pb2.AgentUpdate(
+                    camera_frame_jpg=camera_frame_jpg,
+                    cone=agent_pb2.ConeReading(
+                        ultrasonic_min_m=ultrasonic_min,
+                        heading=self._agent.GetHeading(),
+                    ),
+                )
+            else:
+                readings = self._agent.GetSensorReading()
+                if readings:
+                    yield agent_pb2.AgentUpdate(
+                        camera_frame_jpg=camera_frame_jpg,
+                        ray_batch=agent_pb2.RayBatch(rays=[
+                            agent_pb2.Ray(
+                                start_x=r.start_x, start_y=r.start_y,
+                                end_x=r.end_x, end_y=r.end_y,
+                                did_collide=r.did_hit,
+                            )
+                            for r in readings
+                        ]),
                     )
-                    for r in readings
-                ])
+                elif camera_frame_jpg:
+                    yield agent_pb2.AgentUpdate(camera_frame_jpg=camera_frame_jpg)
+
             time.sleep(1 / _STREAM_HZ)
 
 

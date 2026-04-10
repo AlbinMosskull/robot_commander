@@ -8,7 +8,7 @@ service AgentControl {
   rpc SetEscapePlan (Path) returns (Empty);
   rpc ObservePosition (PositionObservation) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
-  rpc StreamRays (Empty) returns (stream RayBatch);
+  rpc StreamAgentUpdate (Empty) returns (stream AgentUpdate);
 }
 
 message Path {
@@ -36,6 +36,19 @@ message PositionObservation {
   float x = 1;
   float y = 2;
   float confidence = 3;
+}
+
+message ConeReading {
+  float ultrasonic_min_m = 1;
+  float heading = 2;
+}
+
+message AgentUpdate {
+  bytes camera_frame_jpg = 1;
+  oneof sensor_readings {
+    RayBatch ray_batch = 2;
+    ConeReading cone = 3;
+  }
 }
 
 message Empty {}

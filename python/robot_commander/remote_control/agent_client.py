@@ -27,9 +27,18 @@ class AgentClient:
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
             yield pos.x, pos.y
 
-    def stream_rays(self):
-        for batch in self._stub.StreamRays(agent_pb2.Empty()):
-            yield [(r.start_x, r.start_y, r.end_x, r.end_y, r.did_collide) for r in batch.rays]
+    def stream_agent_updates(self):
+        for update in self._stub.StreamAgentUpdate(agent_pb2.Empty()):
+            camera_frame_jpg = update.camera_frame_jpg or None
+            sensor_case = update.WhichOneof("sensor_readings")
+            if sensor_case == "ray_batch":
+                rays = [(r.start_x, r.start_y, r.end_x, r.end_y, r.did_collide)
+                        for r in update.ray_batch.rays]
+                yield camera_frame_jpg, rays, None
+            elif sensor_case == "cone":
+                yield camera_frame_jpg, None, (update.cone.ultrasonic_min_m, update.cone.heading)
+            else:
+                yield camera_frame_jpg, None, None
 
     def close(self) -> None:
         self._channel.close()

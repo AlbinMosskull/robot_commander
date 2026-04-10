@@ -4,10 +4,14 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from robot_commander import OccupancyMap, WorldPosition2d, plan_path_towards_goal
 from robot_commander.config import load as load_config
+from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
+from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
+from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.localization.world_localizer import WorldLocalizer
 from robot_commander.map_building.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
@@ -39,9 +43,17 @@ class PlanPathFailure:
 
 
 class RemoteControl:
-    def __init__(self, client: AgentClient | None, localizer: WorldLocalizer | None):
+    def __init__(
+        self,
+        client: AgentClient | None,
+        localizer: WorldLocalizer | None,
+        cone_depth_processor: ConeDepthProcessor | None = None,
+        cone_intrinsics: Intrinsics | None = None,
+    ):
         self._client = client
         self._localizer = localizer
+        self._cone_depth_processor = cone_depth_processor
+        self._cone_intrinsics = cone_intrinsics
 
         self._map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
@@ -71,7 +83,7 @@ class RemoteControl:
         self._pos_lock = threading.Lock()
         self._stop_event = threading.Event()
 
-        self._rays_thread: threading.Thread | None = None
+        self._agent_update_thread: threading.Thread | None = None
 
     @property
     def map_coords(self) -> MapCoordinates:
@@ -85,15 +97,15 @@ class RemoteControl:
         if self._client is None:
             return
         self._stop_event.clear()
-        self._rays_thread = threading.Thread(target=self._stream_rays, daemon=True)
-        self._rays_thread.start()
+        self._agent_update_thread = threading.Thread(target=self._stream_agent_updates, daemon=True)
+        self._agent_update_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
         if self._client is not None:
             self._client.close()
-        if self._rays_thread is not None:
-            self._rays_thread.join(timeout=2)
+        if self._agent_update_thread is not None:
+            self._agent_update_thread.join(timeout=2)
 
     @property
     def localization_miss_count(self) -> int:
@@ -200,18 +212,34 @@ class RemoteControl:
             return None
         return [(point.x, point.y) for point in result]
 
-    def _stream_rays(self) -> None:
+    def _stream_agent_updates(self) -> None:
         try:
-            for rays in self._client.stream_rays():
+            for _camera_frame_jpg, rays, cone in self._client.stream_agent_updates():
                 if self._stop_event.is_set():
                     break
                 if self.connection_lost:
                     continue
+                with self._pos_lock:
+                    agent_pos = self._agent_pos
                 with self._occ_lock:
-                    for sx, sy, ex, ey, did_collide in rays:
-                        try:
-                            self._occ_map.ray_update(sx, sy, ex, ey, did_collide)
-                        except Exception:
-                            traceback.print_exc()
+                    if rays:
+                        for sx, sy, ex, ey, did_collide in rays:
+                            try:
+                                self._occ_map.ray_update(sx, sy, ex, ey, did_collide)
+                            except Exception:
+                                traceback.print_exc()
+                    if cone and self._cone_depth_processor is not None and self._cone_intrinsics is not None and agent_pos is not None:
+                        ultrasonic_min, heading = cone
+                        frame = cv2.imdecode(np.frombuffer(_camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                        calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
+                        depth_rays = depth_to_rays(
+                            calibrated_depth, self._cone_intrinsics,
+                            agent_pos[0], agent_pos[1], heading,
+                        )
+                        for ray in depth_rays:
+                            try:
+                                self._occ_map.ray_update(ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit)
+                            except Exception:
+                                traceback.print_exc()
         except Exception:
             traceback.print_exc()

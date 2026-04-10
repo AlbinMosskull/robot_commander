@@ -59,10 +59,10 @@ class AgentControlStub(object):
                 request_serializer=agent__pb2.Empty.SerializeToString,
                 response_deserializer=agent__pb2.Position.FromString,
                 _registered_method=True)
-        self.StreamRays = channel.unary_stream(
-                '/agent.AgentControl/StreamRays',
+        self.StreamAgentUpdate = channel.unary_stream(
+                '/agent.AgentControl/StreamAgentUpdate',
                 request_serializer=agent__pb2.Empty.SerializeToString,
-                response_deserializer=agent__pb2.RayBatch.FromString,
+                response_deserializer=agent__pb2.AgentUpdate.FromString,
                 _registered_method=True)
 
 
@@ -99,7 +99,7 @@ class AgentControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def StreamRays(self, request, context):
+    def StreamAgentUpdate(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -133,10 +133,10 @@ def add_AgentControlServicer_to_server(servicer, server):
                     request_deserializer=agent__pb2.Empty.FromString,
                     response_serializer=agent__pb2.Position.SerializeToString,
             ),
-            'StreamRays': grpc.unary_stream_rpc_method_handler(
-                    servicer.StreamRays,
+            'StreamAgentUpdate': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamAgentUpdate,
                     request_deserializer=agent__pb2.Empty.FromString,
-                    response_serializer=agent__pb2.RayBatch.SerializeToString,
+                    response_serializer=agent__pb2.AgentUpdate.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -285,7 +285,7 @@ class AgentControl(object):
             _registered_method=True)
 
     @staticmethod
-    def StreamRays(request,
+    def StreamAgentUpdate(request,
             target,
             options=(),
             channel_credentials=None,
@@ -298,9 +298,9 @@ class AgentControl(object):
         return grpc.experimental.unary_stream(
             request,
             target,
-            '/agent.AgentControl/StreamRays',
+            '/agent.AgentControl/StreamAgentUpdate',
             agent__pb2.Empty.SerializeToString,
-            agent__pb2.RayBatch.FromString,
+            agent__pb2.AgentUpdate.FromString,
             options,
             channel_credentials,
             insecure,

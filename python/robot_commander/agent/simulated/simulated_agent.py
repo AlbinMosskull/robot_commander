@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 from robot_commander.agent.abstract_agent import AbstractAgent
-from robot_commander.agent.data_types import RangeReading
+from robot_commander.sensor.range_reading import RangeReading
 from robot_commander.agent.simulated.motion_model import (
     V_MAX_M_S,
     STEP_DURATION_S,
@@ -144,4 +144,11 @@ class SimulatedAgent(AbstractAgent):
             return list(self._last_readings)
 
     def GetCameraReading(self):
+        return None
+
+    def GetHeading(self) -> float:
+        with self._lock:
+            return self.heading
+
+    def GetUltrasonicMin(self) -> float | None:
         return None
