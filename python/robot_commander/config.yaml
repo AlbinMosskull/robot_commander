@@ -18,4 +18,4 @@ agent:
   port: 50051
 
 map:
-  stencil_path: plots/output/stencil_map.json
+  stencil_path: python/robot_commander/integration_tests/stencil_map.json
