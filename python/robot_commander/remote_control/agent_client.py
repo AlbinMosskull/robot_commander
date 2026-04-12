@@ -20,12 +20,12 @@ class AgentClient:
         path = agent_pb2.Path(waypoints=[agent_pb2.Position(x=x, y=y) for x, y in waypoints])
         self._stub.SetEscapePlan(path)
 
-    def observe_position(self, x: float, y: float, confidence: float) -> None:
-        self._stub.ObservePosition(agent_pb2.PositionObservation(x=x, y=y, confidence=confidence))
+    def observe_position(self, x: float, y: float, heading: float, confidence: float) -> None:
+        self._stub.ObservePosition(agent_pb2.PositionObservation(x=x, y=y, heading=heading, confidence=confidence))
 
     def stream_positions(self):
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
-            yield pos.x, pos.y
+            yield pos.x, pos.y, pos.heading
 
     def stream_agent_updates(self):
         for update in self._stub.StreamAgentUpdate(agent_pb2.Empty()):

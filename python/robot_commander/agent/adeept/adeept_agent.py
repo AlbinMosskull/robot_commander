@@ -122,7 +122,7 @@ class AdeeptAgent(AbstractAgent):
         with self._lock:
             return float(self._position_filter.x[0]), float(self._position_filter.x[1])
 
-    def ObservePosition(self, x: float, y: float, confidence: float) -> None:
+    def ObservePosition(self, x: float, y: float, heading: float, confidence: float) -> None:
         with self._lock:
             self._position_filter.update(np.array([x, y]))
             self._last_remote_message_time = time.time()

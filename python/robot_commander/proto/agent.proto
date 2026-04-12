@@ -18,6 +18,7 @@ message Path {
 message Position {
   float x = 1;
   float y = 2;
+  float heading = 3;
 }
 
 message Ray {
@@ -35,7 +36,8 @@ message RayBatch {
 message PositionObservation {
   float x = 1;
   float y = 2;
-  float confidence = 3;
+  float heading = 3;
+  float confidence = 4;
 }
 
 message ConeReading {

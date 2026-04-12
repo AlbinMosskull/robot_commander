@@ -1,18 +1,16 @@
-"""
-Script to test localization
-"""
+import math
 
 import cv2
-import numpy as np
 
 from robot_commander.image_processing import intrinsics as calibration
 from robot_commander.image_processing.camera import WebCamera
 from robot_commander.image_processing.tag_detector import TagDetector, draw_tags
 from robot_commander.config import load as load_config
 from robot_commander.localization.localizer import Localizer
+from robot_commander.localization.camera_localizer import CameraLocalizer
+from robot_commander.map.map_coordinates import MapCoordinates
 
 _cfg = load_config()
-
 
 
 def main():
@@ -20,6 +18,8 @@ def main():
     detector = TagDetector()
     localizer = Localizer(detector, cam_intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=cam_intrinsics.dist_coeffs)
+    map_coords = MapCoordinates.load(_cfg.map.stencil_path)
+    camera_localizer = CameraLocalizer(localizer, map_coords)
 
     with WebCamera() as cam:
         print("Camera opened. Press 'q' to quit.")
@@ -34,11 +34,10 @@ def main():
             tags = detector.detect(frame)
             annotated = draw_tags(frame, tags)
 
-            pos = localizer.localize(frame)
-            if pos is not None:
-                x, y, z = pos
-                dist = np.linalg.norm(pos)
-                label = f"x={x:.3f}m  y={y:.3f}m  z={z:.3f}m, dist={dist:.3f}m"
+            pose = camera_localizer.localize(frame)
+            if pose is not None:
+                heading_deg = math.degrees(pose.heading)
+                label = f"x={pose.x:.3f}m  y={pose.y:.3f}m  heading={heading_deg:.1f}deg"
                 print(f"  {label}")
                 cv2.putText(annotated, label, (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)

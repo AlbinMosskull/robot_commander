@@ -29,13 +29,13 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         return agent_pb2.Empty()
 
     def ObservePosition(self, request, context):
-        self._agent.ObservePosition(request.x, request.y, request.confidence)
+        self._agent.ObservePosition(request.x, request.y, request.heading, request.confidence)
         return agent_pb2.Empty()
 
     def StreamPosition(self, request, context):
         while context.is_active():
             x, y = self._agent.GetXandY()
-            yield agent_pb2.Position(x=x, y=y)
+            yield agent_pb2.Position(x=x, y=y, heading=self._agent.GetHeading())
             time.sleep(1 / _STREAM_HZ)
 
     def StreamAgentUpdate(self, request, context):

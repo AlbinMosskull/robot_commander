@@ -76,7 +76,7 @@ class CalibratedDepthProcessor:
         raw = self._base.process(frame)
 
         pairs: list[tuple[float, float]] = []
-        for tag, (_, _, z) in tag_poses[:2]:
+        for tag, (_, _, z), _ in tag_poses[:2]:
             mask = np.zeros(raw.shape, dtype=np.uint8)
             cv2.fillPoly(mask, [tag.corners.astype(np.int32).reshape(-1, 1, 2)], 1)
             raw_avg = float(raw[mask == 1].mean())

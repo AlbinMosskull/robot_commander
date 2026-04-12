@@ -1,8 +1,15 @@
+import cv2
 import numpy as np
 
 from robot_commander.localization.localizer import Localizer
-from robot_commander.localization.world_localizer import WorldLocalizer
+from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
+
+
+def _heading_from_rvec(rvec: np.ndarray, u_floor: np.ndarray, v_floor: np.ndarray) -> float:
+    rotation_matrix, _ = cv2.Rodrigues(rvec)
+    tag_x_in_camera = rotation_matrix @ np.array([1.0, 0.0, 0.0])
+    return float(np.arctan2(tag_x_in_camera @ v_floor, tag_x_in_camera @ u_floor))
 
 
 class CameraLocalizer(WorldLocalizer):
@@ -10,9 +17,11 @@ class CameraLocalizer(WorldLocalizer):
         self._localizer = localizer
         self._map_coords = map_coords
 
-    def localize(self, frame: np.ndarray) -> tuple[float, float] | None:
-        result = self._localizer.localize(frame)
-        if result is None:
+    def localize(self, frame: np.ndarray) -> WorldPose | None:
+        results = self._localizer.localize_all(frame)
+        if not results:
             return None
-        x, y, z = result
-        return self._map_coords.camera_to_world_2d(x, y, z)
+        _, (x, y, z), rvec = results[0]
+        world_x, world_y = self._map_coords.camera_to_world_2d(x, y, z)
+        heading = _heading_from_rvec(rvec, self._map_coords.u_floor, self._map_coords.v_floor)
+        return WorldPose(world_x, world_y, heading)

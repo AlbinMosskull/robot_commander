@@ -1,9 +1,16 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 import numpy as np
 
 
+@dataclass
+class WorldPose:
+    x: float
+    y: float
+    heading: float
+
+
 class WorldLocalizer(ABC):
     @abstractmethod
-    def localize(self, frame: np.ndarray) -> tuple[float, float] | None:
-        """Return (x, y) in world coordinates, or None if localization failed."""
+    def localize(self, frame: np.ndarray) -> WorldPose | None: ...

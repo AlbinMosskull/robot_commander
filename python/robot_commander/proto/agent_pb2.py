@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x61gent.proto\x12\x05\x61gent\"*\n\x04Path\x12\"\n\twaypoints\x18\x01 \x03(\x0b\x32\x0f.agent.Position\" \n\x08Position\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\"Z\n\x03Ray\x12\x0f\n\x07start_x\x18\x01 \x01(\x02\x12\x0f\n\x07start_y\x18\x02 \x01(\x02\x12\r\n\x05\x65nd_x\x18\x03 \x01(\x02\x12\r\n\x05\x65nd_y\x18\x04 \x01(\x02\x12\x13\n\x0b\x64id_collide\x18\x05 \x01(\x08\"$\n\x08RayBatch\x12\x18\n\x04rays\x18\x01 \x03(\x0b\x32\n.agent.Ray\"?\n\x13PositionObservation\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\x12\x12\n\nconfidence\x18\x03 \x01(\x02\"8\n\x0b\x43oneReading\x12\x18\n\x10ultrasonic_min_m\x18\x01 \x01(\x02\x12\x0f\n\x07heading\x18\x02 \x01(\x02\"\x84\x01\n\x0b\x41gentUpdate\x12\x18\n\x10\x63\x61mera_frame_jpg\x18\x01 \x01(\x0c\x12$\n\tray_batch\x18\x02 \x01(\x0b\x32\x0f.agent.RayBatchH\x00\x12\"\n\x04\x63one\x18\x03 \x01(\x0b\x32\x12.agent.ConeReadingH\x00\x42\x11\n\x0fsensor_readings\"\x07\n\x05\x45mpty2\xb9\x02\n\x0c\x41gentControl\x12.\n\rSetCheckpoint\x12\x0f.agent.Position\x1a\x0c.agent.Empty\x12$\n\x07SetPath\x12\x0b.agent.Path\x1a\x0c.agent.Empty\x12*\n\rSetEscapePlan\x12\x0b.agent.Path\x1a\x0c.agent.Empty\x12;\n\x0fObservePosition\x12\x1a.agent.PositionObservation\x1a\x0c.agent.Empty\x12\x31\n\x0eStreamPosition\x12\x0c.agent.Empty\x1a\x0f.agent.Position0\x01\x12\x37\n\x11StreamAgentUpdate\x12\x0c.agent.Empty\x1a\x12.agent.AgentUpdate0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x61gent.proto\x12\x05\x61gent\"*\n\x04Path\x12\"\n\twaypoints\x18\x01 \x03(\x0b\x32\x0f.agent.Position\"1\n\x08Position\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\x12\x0f\n\x07heading\x18\x03 \x01(\x02\"Z\n\x03Ray\x12\x0f\n\x07start_x\x18\x01 \x01(\x02\x12\x0f\n\x07start_y\x18\x02 \x01(\x02\x12\r\n\x05\x65nd_x\x18\x03 \x01(\x02\x12\r\n\x05\x65nd_y\x18\x04 \x01(\x02\x12\x13\n\x0b\x64id_collide\x18\x05 \x01(\x08\"$\n\x08RayBatch\x12\x18\n\x04rays\x18\x01 \x03(\x0b\x32\n.agent.Ray\"P\n\x13PositionObservation\x12\t\n\x01x\x18\x01 \x01(\x02\x12\t\n\x01y\x18\x02 \x01(\x02\x12\x0f\n\x07heading\x18\x03 \x01(\x02\x12\x12\n\nconfidence\x18\x04 \x01(\x02\"8\n\x0b\x43oneReading\x12\x18\n\x10ultrasonic_min_m\x18\x01 \x01(\x02\x12\x0f\n\x07heading\x18\x02 \x01(\x02\"\x84\x01\n\x0b\x41gentUpdate\x12\x18\n\x10\x63\x61mera_frame_jpg\x18\x01 \x01(\x0c\x12$\n\tray_batch\x18\x02 \x01(\x0b\x32\x0f.agent.RayBatchH\x00\x12\"\n\x04\x63one\x18\x03 \x01(\x0b\x32\x12.agent.ConeReadingH\x00\x42\x11\n\x0fsensor_readings\"\x07\n\x05\x45mpty2\xb9\x02\n\x0c\x41gentControl\x12.\n\rSetCheckpoint\x12\x0f.agent.Position\x1a\x0c.agent.Empty\x12$\n\x07SetPath\x12\x0b.agent.Path\x1a\x0c.agent.Empty\x12*\n\rSetEscapePlan\x12\x0b.agent.Path\x1a\x0c.agent.Empty\x12;\n\x0fObservePosition\x12\x1a.agent.PositionObservation\x1a\x0c.agent.Empty\x12\x31\n\x0eStreamPosition\x12\x0c.agent.Empty\x1a\x0f.agent.Position0\x01\x12\x37\n\x11StreamAgentUpdate\x12\x0c.agent.Empty\x1a\x12.agent.AgentUpdate0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,19 +34,19 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PATH']._serialized_start=22
   _globals['_PATH']._serialized_end=64
   _globals['_POSITION']._serialized_start=66
-  _globals['_POSITION']._serialized_end=98
-  _globals['_RAY']._serialized_start=100
-  _globals['_RAY']._serialized_end=190
-  _globals['_RAYBATCH']._serialized_start=192
-  _globals['_RAYBATCH']._serialized_end=228
-  _globals['_POSITIONOBSERVATION']._serialized_start=230
-  _globals['_POSITIONOBSERVATION']._serialized_end=293
-  _globals['_CONEREADING']._serialized_start=295
-  _globals['_CONEREADING']._serialized_end=351
-  _globals['_AGENTUPDATE']._serialized_start=354
-  _globals['_AGENTUPDATE']._serialized_end=486
-  _globals['_EMPTY']._serialized_start=488
-  _globals['_EMPTY']._serialized_end=495
-  _globals['_AGENTCONTROL']._serialized_start=498
-  _globals['_AGENTCONTROL']._serialized_end=811
+  _globals['_POSITION']._serialized_end=115
+  _globals['_RAY']._serialized_start=117
+  _globals['_RAY']._serialized_end=207
+  _globals['_RAYBATCH']._serialized_start=209
+  _globals['_RAYBATCH']._serialized_end=245
+  _globals['_POSITIONOBSERVATION']._serialized_start=247
+  _globals['_POSITIONOBSERVATION']._serialized_end=327
+  _globals['_CONEREADING']._serialized_start=329
+  _globals['_CONEREADING']._serialized_end=385
+  _globals['_AGENTUPDATE']._serialized_start=388
+  _globals['_AGENTUPDATE']._serialized_end=520
+  _globals['_EMPTY']._serialized_start=522
+  _globals['_EMPTY']._serialized_end=529
+  _globals['_AGENTCONTROL']._serialized_start=532
+  _globals['_AGENTCONTROL']._serialized_end=845
 # @@protoc_insertion_point(module_scope)

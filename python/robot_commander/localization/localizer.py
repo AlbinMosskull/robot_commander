@@ -48,23 +48,24 @@ class Localizer:
         results = self.localize_all(frame)
         if not results:
             return None
-        _, pos = results[0]
+        _, pos, _ = results[0]
         return pos
 
     def localize_all(
         self, frame: cv2.typing.MatLike
-    ) -> list[tuple[DetectedTag, tuple[float, float, float]]]:
-        """Return (tag, (x, y, z)) for every detected tag that solvePnP succeeds on."""
+    ) -> list[tuple[DetectedTag, tuple[float, float, float], np.ndarray]]:
+        """Return (tag, (x, y, z), rvec) for every detected tag that solvePnP succeeds on."""
         tags = self._detector.detect(frame)
         results = []
         for tag in tags:
-            success, _, tvec = cv2.solvePnP(
+            success, rvec, tvec = cv2.solvePnP(
                 self._obj_points, tag.corners.astype(np.float32),
                 self._camera_matrix, self._dist_coeffs,
             )
             if success:
                 x, y, z = tvec.flatten()
                 if z < 0:
-                    x, y, z = -x, -y, -z  # flip the mirrored solvePnP solution
-                results.append((tag, (float(x), float(y), float(z))))
+                    x, y, z = -x, -y, -z
+                    rvec = -rvec
+                results.append((tag, (float(x), float(y), float(z)), rvec))
         return results

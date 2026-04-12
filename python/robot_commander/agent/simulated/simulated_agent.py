@@ -136,7 +136,7 @@ class SimulatedAgent(AbstractAgent):
         with self._lock:
             return float(self._position_filter.x[0]), float(self._position_filter.x[1])
 
-    def ObservePosition(self, x: float, y: float, confidence: float) -> None:
+    def ObservePosition(self, x: float, y: float, heading: float, confidence: float) -> None:
         self._notify_remote_message()  # Simulated agent has ground-truth position; no correction needed.
 
     def GetSensorReading(self) -> list[RangeReading]:

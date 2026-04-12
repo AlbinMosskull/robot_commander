@@ -34,14 +34,15 @@ def agent_server_and_client():
 def test_position_stream_delivers_continuous_updates(agent_server_and_client):
     _, client = agent_server_and_client
     collected_positions = []
-    for x, y in client.stream_positions():
-        collected_positions.append((x, y))
+    for x, y, heading in client.stream_positions():
+        collected_positions.append((x, y, heading))
         if len(collected_positions) >= 5:
             break
     assert len(collected_positions) == 5
-    for x, y in collected_positions:
+    for x, y, heading in collected_positions:
         assert math.isfinite(x)
         assert math.isfinite(y)
+        assert math.isfinite(heading)
 
 
 def test_agent_moves_toward_waypoint(agent_server_and_client):
