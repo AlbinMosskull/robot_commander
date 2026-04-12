@@ -8,11 +8,11 @@ from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.sensor.range_reading import RangeReading
 from robot_commander.agent.simulated.motion_model import (
     V_MAX_M_S,
-    STEP_DURATION_S,
     WAYPOINT_THRESHOLD_M,
+    HEADING_ALIGNMENT_RAD,
     advance_heading,
-    advance_velocity,
-    cardinal_direction,
+    advance_speed,
+    normalize_angle,
 )
 from robot_commander.agent.simulated.sensors import SimulatedSensor, ConeSensor
 from robot_commander.filtering.kalman_filter import KalmanFilter
@@ -43,11 +43,7 @@ class SimulatedAgent(AbstractAgent):
         self.x = start_x
         self.y = start_y
         self.heading: float = math.pi / 2
-        self._vx: float = 0.0
-        self._vy: float = 0.0
-        self._step_timer: float = 0.0
-        self._committed_vx: float = 0.0
-        self._committed_vy: float = 0.0
+        self._speed: float = 0.0
 
         self._position_filter = _make_position_filter(start_x, start_y)
         self._sensor = sensor if sensor is not None else ConeSensor()
@@ -81,26 +77,19 @@ class SimulatedAgent(AbstractAgent):
         distance = math.hypot(goal_x - self.x, goal_y - self.y)
 
         if distance < WAYPOINT_THRESHOLD_M:
-            self._vx, self._vy = advance_velocity(self._vx, self._vy, 0.0, 0.0, _DT)
-            self.x += self._vx * _DT
-            self.y += self._vy * _DT
+            self._speed = advance_speed(self._speed, 0.0, _DT)
+            self.x += self._speed * math.cos(self.heading) * _DT
+            self.y += self._speed * math.sin(self.heading) * _DT
             return
 
         self.heading = advance_heading(self.heading, goal_x, goal_y, self.x, self.y, _DT)
 
-        self._step_timer -= _DT
-        if self._step_timer <= 0:
-            ux, uy = cardinal_direction(goal_x, goal_y, self.x, self.y, self.heading)
-            self._vx, self._vy = advance_velocity(self._vx, self._vy, ux * V_MAX_M_S, uy * V_MAX_M_S, _DT)
-            self._committed_vx = self._vx
-            self._committed_vy = self._vy
-            self._step_timer = STEP_DURATION_S
-        else:
-            self._vx = self._committed_vx
-            self._vy = self._committed_vy
+        heading_error = abs(normalize_angle(math.atan2(goal_y - self.y, goal_x - self.x) - self.heading))
+        desired_speed = V_MAX_M_S if heading_error < HEADING_ALIGNMENT_RAD else 0.0
+        self._speed = advance_speed(self._speed, desired_speed, _DT)
 
-        self.x += self._vx * _DT
-        self.y += self._vy * _DT
+        self.x += self._speed * math.cos(self.heading) * _DT
+        self.y += self._speed * math.sin(self.heading) * _DT
 
     def _tick_loop(self):
         while True:
@@ -110,8 +99,9 @@ class SimulatedAgent(AbstractAgent):
                 else:
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(self._waypoints, self._waypoint_idx)
 
-                u = np.array([self._vx * _DT, self._vy * _DT])
-                self._position_filter.predict(u)
+                dx = self._speed * math.cos(self.heading) * _DT
+                dy = self._speed * math.sin(self.heading) * _DT
+                self._position_filter.predict(np.array([dx, dy]))
 
                 noisy_gps = np.array([self.x, self.y]) + np.random.normal(0, _GPS_NOISE_STD, 2)
                 self._position_filter.update(noisy_gps)
