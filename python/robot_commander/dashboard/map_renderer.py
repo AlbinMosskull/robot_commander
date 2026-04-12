@@ -1,3 +1,5 @@
+import math
+
 import cv2
 import numpy as np
 
@@ -29,9 +31,15 @@ class MapRenderer:
             cv2.circle(canvas, checkpoint_px, 8, (0, 0, 0), 1)
 
         if state.agent_pos is not None:
-            agent_px = self._map_coords.world_to_px(*state.agent_pos)
+            agent_px = self._map_coords.world_to_px(state.agent_pos.x, state.agent_pos.y)
             cv2.circle(canvas, agent_px, 8, (200, 80, 0), -1)
             cv2.circle(canvas, agent_px, 8, (0, 0, 0), 1)
+            arrow_len_m = 0.15
+            tip_px = self._map_coords.world_to_px(
+                state.agent_pos.x + arrow_len_m * math.cos(state.agent_pos.heading),
+                state.agent_pos.y + arrow_len_m * math.sin(state.agent_pos.heading),
+            )
+            cv2.arrowedLine(canvas, agent_px, tip_px, (200, 80, 0), 2, tipLength=0.4)
 
         return canvas
 

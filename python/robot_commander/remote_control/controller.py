@@ -12,7 +12,7 @@ from robot_commander.config import load as load_config
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
 from robot_commander.image_processing.intrinsics import Intrinsics
-from robot_commander.localization.world_localizer import WorldLocalizer
+from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
@@ -25,7 +25,7 @@ _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 
 @dataclass
 class MapState:
-    agent_pos: tuple[float, float] | None
+    agent_pos: WorldPose | None
     planned_path: list[tuple[float, float]]
     checkpoint: tuple[float, float] | None
     occ_grid: np.ndarray = field(repr=False)
@@ -76,7 +76,7 @@ class RemoteControl:
 
         self._checkpoint: tuple[float, float] | None = None
         self._planned_path: list[tuple[float, float]] = []
-        self._agent_pos: tuple[float, float] | None = None
+        self._agent_pos: WorldPose | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
@@ -134,17 +134,18 @@ class RemoteControl:
     def update(self, frame: np.ndarray) -> None:
         if self._localizer is None:
             return
-        pos = None if self._localization_jammed else self._localizer.localize(frame)
+        pose = None if self._localization_jammed else self._localizer.localize(frame)
         with self._pos_lock:
-            if pos is not None:
-                self._agent_pos = pos
+            if pose is not None:
+                self._agent_pos = pose
                 self._localization_miss_count = 0
             else:
                 self._localization_miss_count = min(
                     self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
                 )
-        if pos is not None and self._client is not None:
-            escape_path = self._plan_path(WorldPosition2d(pos[0], pos[1]), WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz")
+        if pose is not None and self._client is not None:
+            self._client.observe_position(pose.x, pose.y, pose.heading, confidence=1.0)
+            escape_path = self._plan_path(WorldPosition2d(pose.x, pose.y), WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz")
             if escape_path is not None:
                 self._client.set_escape_plan(escape_path)
                 with self._pos_lock:
@@ -171,7 +172,7 @@ class RemoteControl:
                 start = self._agent_pos
             if start is None or self._client is None:
                 return
-            result = self._plan_path(WorldPosition2d(start[0], start[1]), WorldPosition2d(wx, wy), "user_path.npz")
+            result = self._plan_path(WorldPosition2d(start.x, start.y), WorldPosition2d(wx, wy), "user_path.npz")
             if result is None:
                 return
             self._planned_path = result
@@ -234,7 +235,7 @@ class RemoteControl:
                         calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
                         depth_rays = depth_to_rays(
                             calibrated_depth, self._cone_intrinsics,
-                            agent_pos[0], agent_pos[1], heading,
+                            agent_pos.x, agent_pos.y, heading,
                         )
                         for ray in depth_rays:
                             try:
