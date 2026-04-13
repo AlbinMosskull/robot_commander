@@ -9,9 +9,11 @@ from picamera2 import Picamera2
 from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.sensor.range_reading import RangeReading
 from robot_commander.filtering.kalman_filter import KalmanFilter
+from robot_commander.filtering.heading_filter import HeadingFilter
 from robot_commander.agent.adeept.hardware.Move import RaspClaws
 from robot_commander.agent.adeept.hardware import Ultra
 from robot_commander.agent.adeept.adeept_motion_model import (
+    OMEGA_MAX_RAD_S,
     WAYPOINT_THRESHOLD_M,
     normalize_angle,
     direction_command,
@@ -56,7 +58,11 @@ class AdeeptAgent(AbstractAgent):
         self._camera.start()
 
         self._position_filter = _make_position_filter()
-        self._heading: float = 0.0
+        self._heading_filter = HeadingFilter(
+            initial_heading=0.0,
+            process_noise=0.01,
+            measurement_noise=0.1,
+        )
         self._current_command: str = "stand"
         self._manual_override: bool = False
         self._lock = threading.Lock()
@@ -110,8 +116,15 @@ class AdeeptAgent(AbstractAgent):
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(
                         self._waypoints, self._waypoint_idx
                     )
-                dx, dy = predict_displacement(self._current_command, self._heading, _DT)
+                current_heading = self._heading_filter.heading
+                dx, dy = predict_displacement(self._current_command, current_heading, _DT)
                 self._position_filter.predict(np.array([dx, dy]))
+                if self._current_command == "left":
+                    self._heading_filter.predict(OMEGA_MAX_RAD_S * _DT)
+                elif self._current_command == "right":
+                    self._heading_filter.predict(-OMEGA_MAX_RAD_S * _DT)
+                else:
+                    self._heading_filter.predict(0.0)
             time.sleep(_DT)
 
     def SetWaypointList(self, waypoints: list[tuple[float, float]]) -> None:
@@ -133,7 +146,7 @@ class AdeeptAgent(AbstractAgent):
     def ObservePosition(self, x: float, y: float, heading: float, confidence: float) -> None:
         with self._lock:
             self._position_filter.update(np.array([x, y]))
-            self._heading = heading
+            self._heading_filter.update(heading)
             self._last_remote_message_time = time.time()
 
     def GetSensorReading(self) -> list[RangeReading]:
@@ -147,7 +160,7 @@ class AdeeptAgent(AbstractAgent):
 
     def GetHeading(self) -> float:
         with self._lock:
-            return self._heading
+            return self._heading_filter.heading
 
     def GetUltrasonicMin(self) -> float | None:
         distance_cm = Ultra.checkdist()
