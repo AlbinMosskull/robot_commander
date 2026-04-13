@@ -98,7 +98,7 @@ class AdeeptAgent(AbstractAgent):
                 return [], 0
             target_x, target_y = waypoints[index]
 
-        heading_error = normalize_angle(math.atan2(target_y - current_y, target_x - current_x) - self._heading)
+        heading_error = normalize_angle(math.atan2(target_y - current_y, target_x - current_x) - self._heading_filter.heading)
         command = direction_command(heading_error)
         self._current_command = command
         self._robot.command_input(command)
