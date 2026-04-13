@@ -14,7 +14,7 @@ tag:
   size_m: 0.03
 
 agent:
-  host: localhost  # 192.168.0.43
+  host: 192.168.0.43  # localhost
   port: 50051
 
 map:

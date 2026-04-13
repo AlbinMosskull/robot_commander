@@ -55,6 +55,7 @@ class AdeeptAgent(AbstractAgent):
         self._position_filter = _make_position_filter()
         self._heading: float = 0.0
         self._current_command: str = "stand"
+        self._manual_override: bool = False
         self._lock = threading.Lock()
         self._waypoints: list[tuple[float, float]] = []
         self._waypoint_idx: int = 0
@@ -70,6 +71,8 @@ class AdeeptAgent(AbstractAgent):
         waypoints: list[tuple[float, float]],
         index: int,
     ) -> tuple[list[tuple[float, float]], int]:
+        if self._manual_override:
+            return waypoints, index
         if not waypoints:
             self._current_command = "stand"
             self._robot.command_input("stand")
@@ -150,6 +153,12 @@ class AdeeptAgent(AbstractAgent):
         return distance_cm / 100.0
 
     def RunCommand(self, command: str, duration_s: float) -> None:
-        self._robot.command_input(command)
-        time.sleep(duration_s)
-        self._robot.command_input("stand")
+        with self._lock:
+            self._manual_override = True
+        try:
+            self._robot.command_input(command)
+            time.sleep(duration_s)
+            self._robot.command_input("stand")
+        finally:
+            with self._lock:
+                self._manual_override = False
