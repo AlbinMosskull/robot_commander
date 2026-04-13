@@ -22,8 +22,9 @@ _ULTRA_HIT_THRESHOLD_CM = 190.0
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
-_CAMERA_WIDTH = 640
-_CAMERA_HEIGHT = 480
+_CAMERA_WIDTH = 1920
+_CAMERA_HEIGHT = 1080
+_IDLE_SERVO_CHANNELS = [12, 13, 14, 15]
 
 
 def _make_position_filter() -> KalmanFilter:
@@ -44,6 +45,8 @@ class AdeeptAgent(AbstractAgent):
         self._robot = RaspClaws()
         self._robot.daemon = True
         self._robot.start()
+        for ch in _IDLE_SERVO_CHANNELS:
+            self._robot.release_servo(ch)
 
         self._camera = Picamera2()
         camera_config = self._camera.create_preview_configuration(

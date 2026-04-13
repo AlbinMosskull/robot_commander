@@ -6,6 +6,7 @@ import grpc
 
 from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.agent.simulated.simulated_agent import SimulatedAgent
+from robot_commander.agent.adeept.adeept_agent import AdeeptAgent
 from robot_commander.proto import agent_pb2, agent_pb2_grpc
 from robot_commander import config as cfg
 
@@ -82,7 +83,7 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
 
 def main():
     port = cfg.load().agent.port
-    agent = SimulatedAgent()
+    agent = AdeeptAgent()
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     agent_pb2_grpc.add_AgentControlServicer_to_server(AgentControlServicer(agent), server)
     server.add_insecure_port(f"[::]:{port}")
