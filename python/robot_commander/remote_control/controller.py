@@ -81,6 +81,8 @@ class RemoteControl:
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
         self._pos_lock = threading.Lock()
+        self._agent_frame: np.ndarray | None = None
+        self._frame_lock = threading.Lock()
         self._stop_event = threading.Event()
 
         self._agent_update_thread: threading.Thread | None = None
@@ -213,13 +215,23 @@ class RemoteControl:
             return None
         return [(point.x, point.y) for point in result]
 
+    @property
+    def latest_agent_frame(self) -> np.ndarray | None:
+        with self._frame_lock:
+            return self._agent_frame
+
     def _stream_agent_updates(self) -> None:
         try:
-            for _camera_frame_jpg, rays, cone in self._client.stream_agent_updates():
+            for camera_frame_jpg, rays, cone in self._client.stream_agent_updates():
                 if self._stop_event.is_set():
                     break
                 if self.connection_lost:
                     continue
+                if camera_frame_jpg is not None:
+                    decoded = cv2.imdecode(np.frombuffer(camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                    if decoded is not None:
+                        with self._frame_lock:
+                            self._agent_frame = decoded
                 with self._pos_lock:
                     agent_pos = self._agent_pos
                 with self._occ_lock:
@@ -231,7 +243,7 @@ class RemoteControl:
                                 traceback.print_exc()
                     if cone and self._cone_depth_processor is not None and self._cone_intrinsics is not None and agent_pos is not None:
                         ultrasonic_min, heading = cone
-                        frame = cv2.imdecode(np.frombuffer(_camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                        frame = self._agent_frame
                         calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
                         depth_rays = depth_to_rays(
                             calibrated_depth, self._cone_intrinsics,

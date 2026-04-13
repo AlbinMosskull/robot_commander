@@ -2,7 +2,7 @@
 
 import math
 
-V_FORWARD_M_S = 0.10
+V_FORWARD_M_S = 0.057
 HEADING_ALIGNMENT_RAD = math.pi / 6
 WAYPOINT_THRESHOLD_M = 0.15
 

@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 from pathlib import Path
 
 from robot_commander.localization.simulated_localizer import SimulatedLocalizer
+from robot_commander.dashboard.agent_camera import AgentCamera
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
@@ -33,7 +34,7 @@ class DashboardWindow(QMainWindow):
         localizer = SimulatedLocalizer(self._client) if self._client is not None else None
         self._controller = RemoteControl(self._client, localizer)
 
-        camera_pov = FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")
+        camera_pov = AgentCamera(self._controller) if self._client is not None else FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")
         camera_overhead = FromFileCamera(_EXAMPLE_INPUT / "scene_image.jpg")
 
         root_widget = QWidget()
