@@ -123,6 +123,10 @@ class RaspClaws(threading.Thread):
         self.set_servo_angle(servo_index, 90)
         self.init_angles[servo_index] = 90
 
+    def release_servo(self, channel):
+        if 0 <= channel < 16:
+            self.servos[channel].angle = None
+
     def set_servo_angle(self, channel, angle):
         # print(f"angle: {angle}")
         angle = max(0, min(180, angle))

@@ -12,6 +12,8 @@ COMMANDS = {
     " ": "stand",
 }
 
+_IDLE_SERVO_CHANNELS = [12, 13, 14, 15]
+
 HELP_TEXT = """
 Manual control — Adeept RaspClaws
   w  forward
@@ -39,6 +41,8 @@ def main():
     robot = RaspClaws()
     robot.daemon = True
     robot.start()
+    for ch in _IDLE_SERVO_CHANNELS:
+        robot.release_servo(ch)
 
     while True:
         key = read_single_key()
