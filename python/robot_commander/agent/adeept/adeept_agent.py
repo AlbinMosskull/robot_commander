@@ -148,3 +148,8 @@ class AdeeptAgent(AbstractAgent):
         if distance_cm >= _ULTRA_HIT_THRESHOLD_CM:
             return None
         return distance_cm / 100.0
+
+    def RunCommand(self, command: str, duration_s: float) -> None:
+        self._robot.command_input(command)
+        time.sleep(duration_s)
+        self._robot.command_input("stand")

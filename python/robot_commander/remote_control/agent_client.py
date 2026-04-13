@@ -23,6 +23,9 @@ class AgentClient:
     def observe_position(self, x: float, y: float, heading: float, confidence: float) -> None:
         self._stub.ObservePosition(agent_pb2.PositionObservation(x=x, y=y, heading=heading, confidence=confidence))
 
+    def run_command(self, command: str, duration_s: float) -> None:
+        self._stub.RunCommand(agent_pb2.CommandRequest(command=command, duration_s=duration_s))
+
     def stream_positions(self):
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
             yield pos.x, pos.y, pos.heading

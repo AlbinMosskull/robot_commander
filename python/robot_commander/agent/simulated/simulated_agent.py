@@ -142,3 +142,6 @@ class SimulatedAgent(AbstractAgent):
 
     def GetUltrasonicMin(self) -> float | None:
         return None
+
+    def RunCommand(self, command: str, duration_s: float) -> None:
+        time.sleep(duration_s)

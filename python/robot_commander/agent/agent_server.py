@@ -38,6 +38,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
             yield agent_pb2.Position(x=x, y=y, heading=self._agent.GetHeading())
             time.sleep(1 / _STREAM_HZ)
 
+    def RunCommand(self, request, context):
+        self._agent.RunCommand(request.command, request.duration_s)
+        return agent_pb2.Empty()
+
     def StreamAgentUpdate(self, request, context):
         while context.is_active():
             frame = self._agent.GetCameraReading()

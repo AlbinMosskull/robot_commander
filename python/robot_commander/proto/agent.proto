@@ -9,6 +9,7 @@ service AgentControl {
   rpc ObservePosition (PositionObservation) returns (Empty);
   rpc StreamPosition (Empty) returns (stream Position);
   rpc StreamAgentUpdate (Empty) returns (stream AgentUpdate);
+  rpc RunCommand (CommandRequest) returns (Empty);
 }
 
 message Path {
@@ -51,6 +52,11 @@ message AgentUpdate {
     RayBatch ray_batch = 2;
     ConeReading cone = 3;
   }
+}
+
+message CommandRequest {
+  string command = 1;
+  float duration_s = 2;
 }
 
 message Empty {}

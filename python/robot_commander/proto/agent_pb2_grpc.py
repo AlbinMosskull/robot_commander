@@ -64,6 +64,11 @@ class AgentControlStub(object):
                 request_serializer=agent__pb2.Empty.SerializeToString,
                 response_deserializer=agent__pb2.AgentUpdate.FromString,
                 _registered_method=True)
+        self.RunCommand = channel.unary_unary(
+                '/agent.AgentControl/RunCommand',
+                request_serializer=agent__pb2.CommandRequest.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class AgentControlServicer(object):
@@ -105,6 +110,12 @@ class AgentControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RunCommand(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentControlServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -137,6 +148,11 @@ def add_AgentControlServicer_to_server(servicer, server):
                     servicer.StreamAgentUpdate,
                     request_deserializer=agent__pb2.Empty.FromString,
                     response_serializer=agent__pb2.AgentUpdate.SerializeToString,
+            ),
+            'RunCommand': grpc.unary_unary_rpc_method_handler(
+                    servicer.RunCommand,
+                    request_deserializer=agent__pb2.CommandRequest.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -301,6 +317,33 @@ class AgentControl(object):
             '/agent.AgentControl/StreamAgentUpdate',
             agent__pb2.Empty.SerializeToString,
             agent__pb2.AgentUpdate.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RunCommand(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.AgentControl/RunCommand',
+            agent__pb2.CommandRequest.SerializeToString,
+            agent__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,

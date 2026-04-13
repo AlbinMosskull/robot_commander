@@ -27,3 +27,6 @@ class AbstractAgent(ABC):
 
     @abstractmethod
     def GetUltrasonicMin(self) -> float | None: ...
+
+    @abstractmethod
+    def RunCommand(self, command: str, duration_s: float) -> None: ...
