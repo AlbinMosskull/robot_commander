@@ -1,17 +1,27 @@
-from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
-
+import math
 from pathlib import Path
 
-from robot_commander.localization.simulated_localizer import SimulatedLocalizer
+import numpy as np
+from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
+
+from robot_commander.config import load as load_config
 from robot_commander.dashboard.agent_camera import AgentCamera
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
+from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
+from robot_commander.image_processing import intrinsics as calibration
 from robot_commander.image_processing.camera import FromFileCamera, WebCamera
+from robot_commander.image_processing.intrinsics import Intrinsics
+from robot_commander.image_processing.tag_detector import TagDetector
+from robot_commander.localization.camera_localizer import CameraLocalizer
+from robot_commander.localization.localizer import Localizer
+from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 from robot_commander.remote_control.controller import RemoteControl
 
 _EXAMPLE_INPUT = Path("images/example_input")
+_cfg = load_config()
 
 
 def _try_connect_client() -> AgentClient | None:
@@ -19,6 +29,25 @@ def _try_connect_client() -> AgentClient | None:
         return AgentClient()
     except Exception:
         return None
+
+
+def _build_localizer_and_depth_processor(
+    cam_intrinsics: Intrinsics,
+) -> tuple[CameraLocalizer, ConeDepthProcessor]:
+    detector = TagDetector()
+    localizer = Localizer(detector, cam_intrinsics.camera_matrix, _cfg.tag.size_m,
+                          dist_coeffs=cam_intrinsics.dist_coeffs)
+    map_coords = MapCoordinates.load(_cfg.map.stencil_path)
+    heading_offset = math.radians(_cfg.localization.heading_offset_deg)
+    camera_localizer = CameraLocalizer(localizer, map_coords, heading_offset=heading_offset)
+
+    cone_geometry = ConeGeometry(half_angle_radians=math.radians(_cfg.depth.cone_half_angle_deg))
+    depth_processor = ConeDepthProcessor(
+        intrinsics=cam_intrinsics,
+        camera_T_sensor=np.eye(4, dtype=np.float64),
+        cone_geometry=cone_geometry,
+    )
+    return camera_localizer, depth_processor
 
 
 class DashboardWindow(QMainWindow):
@@ -31,8 +60,14 @@ class DashboardWindow(QMainWindow):
         )
 
         self._client = _try_connect_client()
-        localizer = SimulatedLocalizer(self._client) if self._client is not None else None
-        self._controller = RemoteControl(self._client, localizer)
+        if self._client is not None:
+            cam_intrinsics = calibration.load()
+            localizer, depth_processor = _build_localizer_and_depth_processor(cam_intrinsics)
+            self._controller = RemoteControl(self._client, localizer,
+                                             cone_depth_processor=depth_processor,
+                                             cone_intrinsics=cam_intrinsics)
+        else:
+            self._controller = RemoteControl(None, None)
 
         camera_pov = AgentCamera(self._controller) if self._client is not None else FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")
         camera_overhead = WebCamera()

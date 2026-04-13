@@ -22,3 +22,6 @@ map:
 
 localization:
   heading_offset_deg: 84.6
+
+depth:
+  cone_half_angle_deg: 15.0

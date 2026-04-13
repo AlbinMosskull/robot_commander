@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QLabel, QMainWindow, QProgressBar, QVBoxLayout, QWid
 class SlideshowWindow(QMainWindow):
     finished = pyqtSignal()
 
-    def __init__(self, images: list[Path], duration_ms: int = 2000):
+    def __init__(self, images: list[Path], duration_ms: int = 300):
         super().__init__()
         self.setWindowTitle("Robot Commander")
         self.resize(1280, 720)

@@ -44,6 +44,11 @@ class LocalizationConfig:
 
 
 @dataclass(frozen=True)
+class DepthConfig:
+    cone_half_angle_deg: float
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig
     checkerboard: CheckerboardConfig
@@ -51,6 +56,7 @@ class Config:
     agent: AgentConfig
     map: MapConfig
     localization: LocalizationConfig
+    depth: DepthConfig
 
 
 def load(path: Path = _CONFIG_PATH) -> Config:
@@ -82,5 +88,8 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         ),
         localization=LocalizationConfig(
             heading_offset_deg=raw["localization"]["heading_offset_deg"],
+        ),
+        depth=DepthConfig(
+            cone_half_angle_deg=raw["depth"]["cone_half_angle_deg"],
         ),
     )
