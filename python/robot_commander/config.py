@@ -39,12 +39,18 @@ class MapConfig:
 
 
 @dataclass(frozen=True)
+class LocalizationConfig:
+    heading_offset_deg: float
+
+
+@dataclass(frozen=True)
 class Config:
     camera: CameraConfig
     checkerboard: CheckerboardConfig
     tag: TagConfig
     agent: AgentConfig
     map: MapConfig
+    localization: LocalizationConfig
 
 
 def load(path: Path = _CONFIG_PATH) -> Config:
@@ -73,5 +79,8 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         ),
         map=MapConfig(
             stencil_path=Path(raw["map"]["stencil_path"]),
+        ),
+        localization=LocalizationConfig(
+            heading_offset_deg=raw["localization"]["heading_offset_deg"],
         ),
     )

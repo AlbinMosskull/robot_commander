@@ -20,8 +20,9 @@ class HeadingFilter:
         self._heading = _normalize_angle(self._heading + delta_heading)
         self._variance += self._process_noise
 
-    def update(self, observed_heading: float) -> None:
+    def update(self, observed_heading: float) -> float:
         innovation = _normalize_angle(observed_heading - self._heading)
         gain = self._variance / (self._variance + self._measurement_noise)
         self._heading = _normalize_angle(self._heading + gain * innovation)
         self._variance = (1.0 - gain) * self._variance
+        return innovation

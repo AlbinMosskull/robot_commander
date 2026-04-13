@@ -145,9 +145,13 @@ class AdeeptAgent(AbstractAgent):
 
     def ObservePosition(self, x: float, y: float, heading: float, confidence: float) -> None:
         with self._lock:
-            self._position_filter.update(np.array([x, y]))
-            self._heading_filter.update(heading)
+            pos_innovation = self._position_filter.update(np.array([x, y]))
+            heading_innovation = self._heading_filter.update(heading)
             self._last_remote_message_time = time.time()
+        print(
+            f"filter innovation — position: ({pos_innovation[0]:+.3f}, {pos_innovation[1]:+.3f}) m  "
+            f"heading: {math.degrees(heading_innovation):+.1f}°"
+        )
 
     def GetSensorReading(self) -> list[RangeReading]:
         return []

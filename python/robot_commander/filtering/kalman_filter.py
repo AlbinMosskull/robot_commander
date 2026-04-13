@@ -27,7 +27,7 @@ class KalmanFilter:
         # Propagate uncertainty — grows due to process noise Q
         self.P = self.F @ self.P @ self.F.transpose() + self.Q
 
-    def update(self, z: np.ndarray) -> None:
+    def update(self, z: np.ndarray) -> np.ndarray:
         # Compute residual between measurement and prediction
         y = z - self.H @ self.x
 
@@ -43,4 +43,6 @@ class KalmanFilter:
         # Update covariance — shrinks after incorporating measurement
         I = np.eye(self.P.shape[0])
         self.P = (I - K @ self.H) @ self.P
+
+        return y
 
