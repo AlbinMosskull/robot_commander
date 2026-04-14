@@ -17,11 +17,12 @@ from robot_commander.agent.adeept.adeept_motion_model import (
     OMEGA_MAX_RAD_S,
     WAYPOINT_THRESHOLD_M,
     normalize_angle,
-    direction_command,
     predict_displacement,
 )
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
+_HEADING_ENTRY_RAD = math.radians(15)
+_HEADING_EXIT_RAD = math.radians(30)
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
@@ -65,6 +66,7 @@ class AdeeptAgent(AbstractAgent):
             measurement_noise=0.1,
         )
         self._current_command: str = "stand"
+        self._heading_aligned: bool = False
         self._manual_override: bool = False
         self._lock = threading.Lock()
         self._waypoints: list[tuple[float, float]] = []
@@ -95,6 +97,7 @@ class AdeeptAgent(AbstractAgent):
 
         if math.hypot(current_x - target_x, current_y - target_y) < WAYPOINT_THRESHOLD_M:
             index += 1
+            self._heading_aligned = False
             if index >= len(waypoints):
                 self._current_command = "stand"
                 self._robot.command_input("stand")
@@ -102,7 +105,17 @@ class AdeeptAgent(AbstractAgent):
             target_x, target_y = waypoints[index]
 
         heading_error = normalize_angle(math.atan2(target_y - current_y, target_x - current_x) - self._heading_filter.heading)
-        command = direction_command(heading_error)
+
+        if abs(heading_error) < _HEADING_ENTRY_RAD:
+            self._heading_aligned = True
+        elif abs(heading_error) > _HEADING_EXIT_RAD:
+            self._heading_aligned = False
+
+        if self._heading_aligned:
+            command = "forward"
+        else:
+            command = "left" if heading_error > 0 else "right"
+
         self._current_command = command
         self._robot.command_input(command)
         return waypoints, index
@@ -162,12 +175,14 @@ class AdeeptAgent(AbstractAgent):
         with self._lock:
             self._waypoints = list(waypoints)
             self._waypoint_idx = 0
+            self._heading_aligned = False
             self._last_remote_message_time = time.time()
 
     def SetEscapePlan(self, waypoints: list[tuple[float, float]]) -> None:
         with self._lock:
             self._escape_plan = list(waypoints)
             self._escape_plan_idx = 0
+            self._heading_aligned = False
             self._last_remote_message_time = time.time()
 
     def GetXandY(self) -> tuple[float, float]:
