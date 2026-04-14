@@ -12,6 +12,7 @@ from robot_commander.filtering.kalman_filter import KalmanFilter
 from robot_commander.filtering.heading_filter import HeadingFilter
 from robot_commander.agent.adeept.hardware.Move import RaspClaws
 from robot_commander.agent.adeept.hardware import Ultra
+from robot_commander.agent.adeept.run_logger import RunLogger
 from robot_commander.agent.adeept.adeept_motion_model import (
     OMEGA_MAX_RAD_S,
     WAYPOINT_THRESHOLD_M,
@@ -72,6 +73,8 @@ class AdeeptAgent(AbstractAgent):
         self._escape_plan_idx: int = 0
         self._last_remote_message_time: float = time.time()
 
+        self._logger = RunLogger()
+
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
         self._tick_thread.start()
 
@@ -112,11 +115,17 @@ class AdeeptAgent(AbstractAgent):
                     self._escape_plan, self._escape_plan_idx = self._follow_waypoints(
                         self._escape_plan, self._escape_plan_idx
                     )
+                    active_waypoints = self._escape_plan
+                    active_idx = self._escape_plan_idx
                 else:
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(
                         self._waypoints, self._waypoint_idx
                     )
+                    active_waypoints = self._waypoints
+                    active_idx = self._waypoint_idx
                 current_heading = self._heading_filter.heading
+                current_x = float(self._position_filter.x[0])
+                current_y = float(self._position_filter.x[1])
                 dx, dy = predict_displacement(self._current_command, current_heading, _DT)
                 self._position_filter.predict(np.array([dx, dy]))
                 if self._current_command == "left":
@@ -125,6 +134,28 @@ class AdeeptAgent(AbstractAgent):
                     self._heading_filter.predict(-OMEGA_MAX_RAD_S * _DT)
                 else:
                     self._heading_filter.predict(0.0)
+                if active_waypoints and active_idx < len(active_waypoints):
+                    target_x, target_y = active_waypoints[active_idx]
+                    heading_error_log = normalize_angle(
+                        math.atan2(target_y - current_y, target_x - current_x) - current_heading
+                    )
+                    distance_log = math.hypot(current_x - target_x, current_y - target_y)
+                else:
+                    target_x = target_y = heading_error_log = distance_log = None
+                log_heading = self._heading_filter.heading
+                log_variance = self._heading_filter.variance
+                log_command = self._current_command
+            self._logger.log_tick(
+                heading=log_heading,
+                heading_variance=log_variance,
+                pos_x=current_x,
+                pos_y=current_y,
+                command=log_command,
+                heading_error=heading_error_log,
+                distance_to_target=distance_log,
+                target_x=target_x,
+                target_y=target_y,
+            )
             time.sleep(_DT)
 
     def SetWaypointList(self, waypoints: list[tuple[float, float]]) -> None:
@@ -148,10 +179,24 @@ class AdeeptAgent(AbstractAgent):
             pos_innovation = self._position_filter.update(np.array([x, y]))
             heading_innovation = self._heading_filter.update(heading)
             self._last_remote_message_time = time.time()
-        print(
-            f"filter innovation — position: ({pos_innovation[0]:+.3f}, {pos_innovation[1]:+.3f}) m  "
-            f"heading: {math.degrees(heading_innovation):+.1f}°"
+        self._logger.log_observation(
+            observed_heading=heading,
+            heading_innovation=heading_innovation,
+            observed_x=x,
+            observed_y=y,
+            pos_innovation_x=float(pos_innovation[0]),
+            pos_innovation_y=float(pos_innovation[1]),
         )
+        if heading_innovation is None:
+            print(
+                f"filter innovation — position: ({pos_innovation[0]:+.3f}, {pos_innovation[1]:+.3f}) m  "
+                f"heading: rejected (outlier)"
+            )
+        else:
+            print(
+                f"filter innovation — position: ({pos_innovation[0]:+.3f}, {pos_innovation[1]:+.3f}) m  "
+                f"heading: {math.degrees(heading_innovation):+.1f}°"
+            )
 
     def GetSensorReading(self) -> list[RangeReading]:
         return []
