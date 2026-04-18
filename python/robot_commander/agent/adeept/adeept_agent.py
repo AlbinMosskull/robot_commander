@@ -76,6 +76,7 @@ class AdeeptAgent(AbstractAgent):
         self._escape_plan_idx: int = 0
         self._last_remote_message_time: float = time.time()
 
+        self._gyro_heading: float | None = None
         self._logger = RunLogger()
 
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
@@ -144,6 +145,8 @@ class AdeeptAgent(AbstractAgent):
                 self._position_filter.predict(np.array([dx, dy]))
                 gyro_delta = self._gyro.z_angular_velocity_rad_s() * _DT
                 self._heading_filter.predict(gyro_delta)
+                if self._gyro_heading is not None:
+                    self._gyro_heading = normalize_angle(self._gyro_heading + gyro_delta)
                 if active_waypoints and active_idx < len(active_waypoints):
                     target_x, target_y = active_waypoints[active_idx]
                     heading_error_log = normalize_angle(
@@ -155,6 +158,7 @@ class AdeeptAgent(AbstractAgent):
                 log_heading = self._heading_filter.heading
                 log_variance = self._heading_filter.variance
                 log_command = self._current_command
+                log_gyro_heading = self._gyro_heading
             self._logger.log_tick(
                 heading=log_heading,
                 heading_variance=log_variance,
@@ -165,6 +169,7 @@ class AdeeptAgent(AbstractAgent):
                 distance_to_target=distance_log,
                 target_x=target_x,
                 target_y=target_y,
+                gyro_heading=log_gyro_heading,
             )
             time.sleep(_DT)
 
@@ -191,6 +196,8 @@ class AdeeptAgent(AbstractAgent):
             pos_innovation = self._position_filter.update(np.array([x, y]))
             heading_innovation = self._heading_filter.update(heading)
             self._last_remote_message_time = time.time()
+            if self._gyro_heading is None:
+                self._gyro_heading = heading
         self._logger.log_observation(
             observed_heading=heading,
             heading_innovation=heading_innovation,

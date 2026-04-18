@@ -21,6 +21,7 @@ class RunLogger:
             "pos_x_m", "pos_y_m", "command",
             "heading_error_rad", "distance_to_target_m",
             "target_x_m", "target_y_m",
+            "gyro_heading_rad",
         ])
         self._obs_writer.writerow([
             "timestamp_s",
@@ -40,12 +41,14 @@ class RunLogger:
         distance_to_target: float | None,
         target_x: float | None,
         target_y: float | None,
+        gyro_heading: float | None,
     ) -> None:
         self._tick_writer.writerow([
             time.monotonic(), heading, heading_variance,
             pos_x, pos_y, command,
             heading_error, distance_to_target,
             target_x, target_y,
+            gyro_heading,
         ])
 
     def log_observation(
