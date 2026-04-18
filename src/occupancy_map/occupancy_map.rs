@@ -14,7 +14,7 @@ pub struct Position2d {
 
 const DEFAULT_UNCERTAINTY: f32 = 0.5;
 const UPDATE_IF_COLLISION: f32 = 0.85;
-const UPDATE_IF_FREE: f32 = -0.1;
+const UPDATE_IF_FREE: f32 = -0.5;
 const MAX_CELL_VALUE: f32 = 5.0;
 
 #[pyclass]

@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 
+from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.depth_processing.cone_depth_processor import (
     ConeDepthProcessor,
     ConeGeometry,
@@ -27,18 +28,10 @@ _INTRINSICS_PATH = Path("calibration/intrinsics.npz")
 _ULTRASONIC_READING_M = 0.21
 
 _CONE_HALF_ANGLE_DEGREES = 15.0
-_CAMERA_T_SENSOR = np.array([
-    [1.0, 0.0, 0.0,  0.00],
-    [0.0, 1.0, 0.0, -0.10],
-    [0.0, 0.0, 1.0, -0.05],
-    [0.0, 0.0, 0.0,  1.00],
-], dtype=np.float64)
-
-
 def _build_processor() -> ConeDepthProcessor:
     intrinsics = intrinsics_io.load(_INTRINSICS_PATH)
     cone = ConeGeometry(half_angle_radians=np.radians(_CONE_HALF_ANGLE_DEGREES))
-    return ConeDepthProcessor(intrinsics=intrinsics, camera_T_sensor=_CAMERA_T_SENSOR, cone_geometry=cone)
+    return ConeDepthProcessor(intrinsics=intrinsics, camera_T_sensor=CAMERA_T_SENSOR_CENTER, cone_geometry=cone)
 
 
 def _depth_to_colormap(depth: np.ndarray) -> np.ndarray:

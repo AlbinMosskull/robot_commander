@@ -85,10 +85,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-escape-plan", action="store_true", help="Disable escape plan")
+    parser.add_argument("--raw-sensor", action="store_true", help="Sweep ultrasonic sensor and stream rays")
     args = parser.parse_args()
 
     port = cfg.load().agent.port
-    agent = AdeeptAgent(escape_plan_enabled=not args.no_escape_plan)
+    agent = AdeeptAgent(escape_plan_enabled=not args.no_escape_plan, raw_sensor=args.raw_sensor)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     agent_pb2_grpc.add_AgentControlServicer_to_server(AgentControlServicer(agent), server)
     server.add_insecure_port(f"[::]:{port}")

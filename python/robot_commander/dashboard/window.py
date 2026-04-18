@@ -10,6 +10,7 @@ from robot_commander.dashboard.agent_camera import AgentCamera
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
+from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
 from robot_commander.image_processing import intrinsics as calibration
 from robot_commander.image_processing.camera import FromFileCamera, WebCamera
@@ -46,12 +47,7 @@ def _build_localizer_and_depth_processor(
     cone_geometry = ConeGeometry(half_angle_radians=math.radians(_cfg.depth.cone_half_angle_deg))
     depth_processor = ConeDepthProcessor(
         intrinsics=agent_intrinsics,
-        camera_T_sensor=np.array([
-            [1.0, 0.0, 0.0,  0.00],
-            [0.0, 1.0, 0.0, -0.10],
-            [0.0, 0.0, 1.0, -0.05],
-            [0.0, 0.0, 0.0,  1.00],
-        ], dtype=np.float64),
+        camera_T_sensor=CAMERA_T_SENSOR_CENTER,
         cone_geometry=cone_geometry,
     )
     return camera_localizer, depth_processor

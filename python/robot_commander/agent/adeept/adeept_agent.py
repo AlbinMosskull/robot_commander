@@ -9,7 +9,8 @@ from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.sensor.range_reading import RangeReading
 from robot_commander.filtering.kalman_filter import KalmanFilter
 from robot_commander.filtering.heading_filter import HeadingFilter
-from robot_commander.agent.adeept.hardware.Move import RaspClaws
+from robot_commander.agent.adeept import adeept_transforms
+from robot_commander.agent.adeept.hardware.Move import RaspClaws, _DEPTH_SENSOR_PAN_CHANNEL
 from robot_commander.agent.adeept.hardware import Ultra
 from robot_commander.agent.adeept.hardware.mpu6050_gyro import Mpu6050Gyro
 from robot_commander.agent.adeept.run_logger import RunLogger
@@ -20,6 +21,9 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 )
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
+_SWEEP_RANGE_DEG = 45
+_SWEEP_STEP_DEG = 5
+_SWEEP_STEP_INTERVAL_S = 0.05
 _HEADING_ENTRY_RAD = math.radians(15)
 _HEADING_EXIT_RAD = math.radians(30)
 _TICK_HZ = 10
@@ -42,7 +46,7 @@ def _make_position_filter() -> KalmanFilter:
 
 
 class AdeeptAgent(AbstractAgent):
-    def __init__(self, escape_plan_enabled: bool = True):
+    def __init__(self, escape_plan_enabled: bool = True, raw_sensor: bool = False):
         self._robot = RaspClaws()
         self._robot.daemon = True
         self._robot.start()
@@ -74,6 +78,12 @@ class AdeeptAgent(AbstractAgent):
         self._escape_plan_enabled = escape_plan_enabled
         self._gyro_heading: float | None = None
         self._logger = RunLogger()
+
+        self._raw_sensor = raw_sensor
+        if raw_sensor:
+            self._sweep_rays: list[RangeReading] = []
+            self._sweep_lock = threading.Lock()
+            threading.Thread(target=self._run_sweep, daemon=True).start()
 
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
         self._tick_thread.start()
@@ -215,8 +225,50 @@ class AdeeptAgent(AbstractAgent):
                 f"heading: {math.degrees(heading_innovation):+.1f}°"
             )
 
+    def _run_sweep(self) -> None:
+        center = float(self._robot.init_angles[_DEPTH_SENSOR_PAN_CHANNEL])
+        angle_deg = center
+        direction = 1
+        while True:
+            self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, angle_deg)
+            distance_cm = Ultra.checkdist()
+            if distance_cm < _ULTRA_HIT_THRESHOLD_CM:
+                ray = self._servo_reading_to_ray(angle_deg, center, distance_cm / 100.0)
+                with self._sweep_lock:
+                    self._sweep_rays.append(ray)
+            angle_deg += direction * _SWEEP_STEP_DEG
+            if angle_deg >= center + _SWEEP_RANGE_DEG:
+                angle_deg = center + _SWEEP_RANGE_DEG
+                direction = -1
+            elif angle_deg <= center - _SWEEP_RANGE_DEG:
+                angle_deg = center - _SWEEP_RANGE_DEG
+                direction = 1
+            time.sleep(_SWEEP_STEP_INTERVAL_S)
+
+    def _servo_reading_to_ray(
+        self, servo_angle_deg: float, center_angle_deg: float, distance_m: float
+    ) -> RangeReading:
+        offset_rad = math.radians(servo_angle_deg - center_angle_deg)
+        robot_T_s = adeept_transforms.robot_T_sensor(offset_rad)
+        sensor_origin = robot_T_s[:3, 3]
+        sensor_forward = robot_T_s[:3, 2]
+        hit_robot = sensor_origin + distance_m * sensor_forward
+        heading = self.GetHeading()
+        agent_x, agent_y = self.GetXandY()
+        c, s = math.cos(heading), math.sin(heading)
+        start_x = agent_x + c * sensor_origin[0] - s * sensor_origin[1]
+        start_y = agent_y + s * sensor_origin[0] + c * sensor_origin[1]
+        hit_world_x = agent_x + c * hit_robot[0] - s * hit_robot[1]
+        hit_world_y = agent_y + s * hit_robot[0] + c * hit_robot[1]
+        return RangeReading(start_x, start_y, hit_world_x, hit_world_y, did_hit=True)
+
     def GetSensorReading(self) -> list[RangeReading]:
-        return []
+        if not self._raw_sensor:
+            return []
+        with self._sweep_lock:
+            rays = list(self._sweep_rays)
+            self._sweep_rays.clear()
+        return rays
 
     def GetCameraReading(self) -> np.ndarray | None:
         return self._camera.capture_array()
@@ -226,6 +278,8 @@ class AdeeptAgent(AbstractAgent):
             return self._heading_filter.heading
 
     def GetUltrasonicMin(self) -> float | None:
+        if self._raw_sensor:
+            return None
         distance_cm = Ultra.checkdist()
         if distance_cm >= _ULTRA_HIT_THRESHOLD_CM:
             return None
