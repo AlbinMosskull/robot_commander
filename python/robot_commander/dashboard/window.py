@@ -2,6 +2,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 
 from robot_commander.config import load as load_config
@@ -47,7 +48,8 @@ def _build_localizer_and_depth_processor(
         camera_T_sensor=np.eye(4, dtype=np.float64),
         cone_geometry=cone_geometry,
     )
-    return camera_localizer, depth_processor
+    # return camera_localizer, depth_processor
+    return camera_localizer, None
 
 
 class DashboardWindow(QMainWindow):
@@ -103,6 +105,11 @@ class DashboardWindow(QMainWindow):
         main_layout.addWidget(right_panel, stretch=2)
 
         root_layout.addWidget(main_area, stretch=1)
+
+    def keyPressEvent(self, event) -> None:
+        if event.key() == Qt.Key.Key_Q:
+            self._controller.set_offset_waypoint(math.pi / 2, 0.20)
+        super().keyPressEvent(event)
 
     def showEvent(self, event) -> None:
         super().showEvent(event)

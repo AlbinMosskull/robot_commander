@@ -13,6 +13,7 @@ class CameraConfig:
     height: int
     preview_width: int
     preview_height: int
+    exposure: int | None
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ def load(path: Path = _CONFIG_PATH) -> Config:
             height=cam["height"],
             preview_width=cam["preview_width"],
             preview_height=cam["preview_height"],
+            exposure=cam.get("exposure"),
         ),
         checkerboard=CheckerboardConfig(
             cols=cb["cols"],

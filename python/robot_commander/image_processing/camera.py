@@ -34,7 +34,13 @@ class WebCamera(Camera):
                       Find the index by running `ls /dev/video*` on Linux.
     """
 
-    def __init__(self, device_index: int = _cfg.camera.device_index, width: int | None = _cfg.camera.width, height: int | None = _cfg.camera.height):
+    def __init__(
+        self,
+        device_index: int = _cfg.camera.device_index,
+        width: int | None = _cfg.camera.width,
+        height: int | None = _cfg.camera.height,
+        exposure: int | None = _cfg.camera.exposure,
+    ):
         self._cap = cv2.VideoCapture(device_index)
         if not self._cap.isOpened():
             raise RuntimeError(f"Could not open camera at device index {device_index}")
@@ -49,6 +55,10 @@ class WebCamera(Camera):
                 raise RuntimeError(
                     f"Camera does not support resolution {width}x{height}, got {actual_w}x{actual_h}"
                 )
+        if exposure is not None:
+            # CAP_PROP_AUTO_EXPOSURE: 1 = manual, 3 = auto (V4L2 convention on Linux)
+            self._cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+            self._cap.set(cv2.CAP_PROP_EXPOSURE, exposure)
 
     def warm_up(self) -> None:
         for _ in range(10):

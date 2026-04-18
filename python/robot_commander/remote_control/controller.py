@@ -1,3 +1,5 @@
+import math
+import queue
 import threading
 import time
 import traceback
@@ -26,6 +28,7 @@ _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 @dataclass
 class MapState:
     agent_pos: WorldPose | None
+    agent_heading: float | None
     planned_path: list[tuple[float, float]]
     checkpoint: tuple[float, float] | None
     occ_grid: np.ndarray = field(repr=False)
@@ -77,6 +80,7 @@ class RemoteControl:
         self._checkpoint: tuple[float, float] | None = None
         self._planned_path: list[tuple[float, float]] = []
         self._agent_pos: WorldPose | None = None
+        self._agent_heading: float | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
@@ -86,6 +90,9 @@ class RemoteControl:
         self._stop_event = threading.Event()
 
         self._agent_update_thread: threading.Thread | None = None
+        self._agent_heading_thread: threading.Thread | None = None
+        self._depth_worker_thread: threading.Thread | None = None
+        self._depth_queue: queue.Queue = queue.Queue(maxsize=1)
 
     @property
     def map_coords(self) -> MapCoordinates:
@@ -101,13 +108,23 @@ class RemoteControl:
         self._stop_event.clear()
         self._agent_update_thread = threading.Thread(target=self._stream_agent_updates, daemon=True)
         self._agent_update_thread.start()
+        self._agent_heading_thread = threading.Thread(target=self._stream_agent_heading, daemon=True)
+        self._agent_heading_thread.start()
+        if self._cone_depth_processor is not None:
+            self._depth_worker_thread = threading.Thread(target=self._depth_worker, daemon=True)
+            self._depth_worker_thread.start()
 
     def stop(self) -> None:
         self._stop_event.set()
+        self._depth_queue.put(None)
         if self._client is not None:
             self._client.close()
         if self._agent_update_thread is not None:
             self._agent_update_thread.join(timeout=2)
+        if self._agent_heading_thread is not None:
+            self._agent_heading_thread.join(timeout=2)
+        if self._depth_worker_thread is not None:
+            self._depth_worker_thread.join(timeout=2)
 
     @property
     def localization_miss_count(self) -> int:
@@ -156,14 +173,27 @@ class RemoteControl:
     def snapshot(self) -> MapState:
         with self._pos_lock:
             agent_pos = self._agent_pos
+            agent_heading = self._agent_heading
         with self._occ_lock:
             occ_grid = np.array(self._occ_map.get_grid(), dtype=np.float32)
         return MapState(
             agent_pos=agent_pos,
+            agent_heading=agent_heading,
             planned_path=list(self._planned_path),
             checkpoint=self._checkpoint,
             occ_grid=occ_grid,
         )
+
+    def set_offset_waypoint(self, angle_offset_rad: float, distance_m: float) -> None:
+        with self._pos_lock:
+            agent_pos = self._agent_pos
+        if agent_pos is None or self._client is None:
+            return
+        target_x = agent_pos.x + distance_m * math.cos(agent_pos.heading + angle_offset_rad)
+        target_y = agent_pos.y + distance_m * math.sin(agent_pos.heading + angle_offset_rad)
+        self._checkpoint = (target_x, target_y)
+        self._planned_path = []
+        self._client.set_checkpoint(target_x, target_y)
 
     def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool) -> None:
         if self.connection_lost:
@@ -220,6 +250,37 @@ class RemoteControl:
         with self._frame_lock:
             return self._agent_frame
 
+    def _depth_worker(self) -> None:
+        while not self._stop_event.is_set():
+            job = self._depth_queue.get()
+            if job is None:
+                break
+            frame, ultrasonic_min, agent_pos, heading = job
+            try:
+                calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
+                depth_rays = depth_to_rays(
+                    calibrated_depth, self._cone_intrinsics,
+                    agent_pos.x, agent_pos.y, heading,
+                )
+                with self._occ_lock:
+                    for ray in depth_rays:
+                        try:
+                            self._occ_map.ray_update(ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit)
+                        except Exception:
+                            traceback.print_exc()
+            except Exception:
+                traceback.print_exc()
+
+    def _stream_agent_heading(self) -> None:
+        try:
+            for _x, _y, heading in self._client.stream_positions():
+                if self._stop_event.is_set():
+                    break
+                with self._pos_lock:
+                    self._agent_heading = heading
+        except Exception:
+            traceback.print_exc()
+
     def _stream_agent_updates(self) -> None:
         try:
             for camera_frame_jpg, rays, cone in self._client.stream_agent_updates():
@@ -241,18 +302,12 @@ class RemoteControl:
                                 self._occ_map.ray_update(sx, sy, ex, ey, did_collide)
                             except Exception:
                                 traceback.print_exc()
-                    if cone and self._cone_depth_processor is not None and self._cone_intrinsics is not None and agent_pos is not None:
-                        ultrasonic_min, heading = cone
-                        frame = self._agent_frame
-                        calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
-                        depth_rays = depth_to_rays(
-                            calibrated_depth, self._cone_intrinsics,
-                            agent_pos.x, agent_pos.y, heading,
-                        )
-                        for ray in depth_rays:
-                            try:
-                                self._occ_map.ray_update(ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit)
-                            except Exception:
-                                traceback.print_exc()
+                if cone and self._cone_depth_processor is not None and self._cone_intrinsics is not None and agent_pos is not None:
+                    ultrasonic_min, heading = cone
+                    frame = self._agent_frame
+                    try:
+                        self._depth_queue.put_nowait((frame, ultrasonic_min, agent_pos, heading))
+                    except queue.Full:
+                        pass
         except Exception:
             traceback.print_exc()

@@ -29,6 +29,11 @@ def _make_localizer(detector):
     return Localizer(detector, _CAMERA_MATRIX, _TAG_SIZE)
 
 
+def _perfect_projectpoints(corners):
+    """Return a cv2.projectPoints mock that reprojects corners exactly."""
+    return (True, np.zeros((3, 1)), np.zeros((3, 1))), corners.reshape(-1, 1, 2)
+
+
 def test_localize_returns_none_when_no_tags_visible():
     localizer = _make_localizer(_mock_detector([]))
     assert localizer.localize(_BLANK_FRAME) is None
@@ -45,9 +50,25 @@ def test_localize_returns_metric_position():
     tag = _make_tag(0, 150, 150)
     localizer = _make_localizer(_mock_detector([tag]))
     tvec = np.array([[0.1], [-0.05], [1.2]])
-    with patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)):
+    perfect_projected = tag.corners.reshape(-1, 1, 2)
+    with (
+        patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)),
+        patch("cv2.projectPoints", return_value=(perfect_projected, None)),
+    ):
         result = localizer.localize(_BLANK_FRAME)
     assert result == pytest.approx((0.1, -0.05, 1.2))
+
+
+def test_localize_rejects_high_reprojection_error():
+    tag = _make_tag(0, 150, 150)
+    localizer = _make_localizer(_mock_detector([tag]))
+    tvec = np.array([[0.1], [-0.05], [1.2]])
+    badly_projected = (tag.corners + 50.0).reshape(-1, 1, 2)
+    with (
+        patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)),
+        patch("cv2.projectPoints", return_value=(badly_projected, None)),
+    ):
+        assert localizer.localize(_BLANK_FRAME) is None
 
 
 def test_localize_uses_first_detected_tag():
@@ -55,6 +76,10 @@ def test_localize_uses_first_detected_tag():
     tag_b = _make_tag(1, 200, 200)
     localizer = _make_localizer(_mock_detector([tag_a, tag_b]))
     tvec = np.array([[0.0], [0.0], [1.0]])
-    with patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)) as mock_pnp:
+    perfect_projected = tag_a.corners.reshape(-1, 1, 2)
+    with (
+        patch("cv2.solvePnP", return_value=(True, np.zeros((3, 1)), tvec)) as mock_pnp,
+        patch("cv2.projectPoints", return_value=(perfect_projected, None)),
+    ):
         localizer.localize(_BLANK_FRAME)
     np.testing.assert_array_equal(mock_pnp.call_args_list[0][0][1], tag_a.corners)

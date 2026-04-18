@@ -52,9 +52,16 @@ class Localizer:
         return pos
 
     def localize_all(
-        self, frame: cv2.typing.MatLike
+        self,
+        frame: cv2.typing.MatLike,
+        max_reprojection_error: float = 2.0,
     ) -> list[tuple[DetectedTag, tuple[float, float, float], np.ndarray]]:
-        """Return (tag, (x, y, z), rvec) for every detected tag that solvePnP succeeds on."""
+        """Return (tag, (x, y, z), rvec) for every detected tag that passes the reprojection check.
+
+        Poses with mean corner reprojection error above max_reprojection_error pixels are
+        discarded — motion blur or partial occlusion cause solvePnP to produce a plausible
+        but wrong pose that would otherwise corrupt the heading estimate.
+        """
         tags = self._detector.detect(frame)
         results = []
         for tag in tags:
@@ -62,10 +69,19 @@ class Localizer:
                 self._obj_points, tag.corners.astype(np.float32),
                 self._camera_matrix, self._dist_coeffs,
             )
-            if success:
-                x, y, z = tvec.flatten()
-                if z < 0:
-                    x, y, z = -x, -y, -z
-                    rvec = -rvec
-                results.append((tag, (float(x), float(y), float(z)), rvec))
+            if not success:
+                continue
+            projected, _ = cv2.projectPoints(
+                self._obj_points, rvec, tvec, self._camera_matrix, self._dist_coeffs
+            )
+            reprojection_error = float(
+                np.mean(np.linalg.norm(projected.reshape(-1, 2) - tag.corners, axis=1))
+            )
+            if reprojection_error > max_reprojection_error:
+                continue
+            x, y, z = tvec.flatten()
+            if z < 0:
+                x, y, z = -x, -y, -z
+                rvec = -rvec
+            results.append((tag, (float(x), float(y), float(z)), rvec))
         return results
