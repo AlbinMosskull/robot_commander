@@ -33,7 +33,7 @@ class HeadingFilter:
 
     def update(self, observed_heading: float) -> float | None:
         innovation = _normalize_angle(observed_heading - self._heading)
-        if abs(innovation) > self._max_innovation:
+        if abs(innovation) > self._max_innovation and self._variance < self._max_innovation:
             return None
         gain = self._variance / (self._variance + self._measurement_noise)
         self._heading = _normalize_angle(self._heading + gain * innovation)
