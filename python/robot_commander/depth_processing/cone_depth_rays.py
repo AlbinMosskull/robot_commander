@@ -61,10 +61,13 @@ def depth_to_rays(
     agent_x: float,
     agent_y: float,
     agent_heading: float,
+    robot_T_camera: np.ndarray = np.eye(4, dtype=np.float64),
     max_obstacle_height_m: float = 1.5,
     num_slices: int = 30,
 ) -> list[RangeReading]:
-    points = depth_image_to_point_cloud(calibrated_depth, intrinsics)
+    camera_points = depth_image_to_point_cloud(calibrated_depth, intrinsics)
+    ones = np.ones((len(camera_points), 1), dtype=np.float32)
+    points = (np.hstack([camera_points, ones]) @ robot_T_camera.T)[:, :3]
     if len(points) < 3:
         return []
 

@@ -35,4 +35,4 @@ class DepthProcessor:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb)
         result = self._pipe(pil_image)
-        return np.array(result["depth"], dtype=np.float32)
+        return result["predicted_depth"].squeeze().numpy().astype(np.float32)

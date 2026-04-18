@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 
 _DEFAULT_PATH = Path("calibration/intrinsics.npz")
+AGENT_CAMERA_PATH = Path("calibration/agent_camera_intrinsics.npz")
 
 
 @dataclass

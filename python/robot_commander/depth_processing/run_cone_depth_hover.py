@@ -27,7 +27,12 @@ _INTRINSICS_PATH = Path("calibration/intrinsics.npz")
 _ULTRASONIC_READING_M = 0.21
 
 _CONE_HALF_ANGLE_DEGREES = 15.0
-_CAMERA_T_SENSOR = np.eye(4, dtype=np.float64)
+_CAMERA_T_SENSOR = np.array([
+    [1.0, 0.0, 0.0,  0.00],
+    [0.0, 1.0, 0.0, -0.10],
+    [0.0, 0.0, 1.0, -0.05],
+    [0.0, 0.0, 0.0,  1.00],
+], dtype=np.float64)
 
 
 def _build_processor() -> ConeDepthProcessor:

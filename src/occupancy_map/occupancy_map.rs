@@ -14,7 +14,8 @@ pub struct Position2d {
 
 const DEFAULT_UNCERTAINTY: f32 = 0.5;
 const UPDATE_IF_COLLISION: f32 = 0.85;
-const UPDATE_IF_FREE: f32 = -0.5;
+const UPDATE_IF_FREE: f32 = -0.1;
+const MAX_CELL_VALUE: f32 = 5.0;
 
 #[pyclass]
 pub struct OccupancyMap {
@@ -72,6 +73,11 @@ impl OccupancyMap {
 
     pub fn set_grid(&mut self, grid: Vec<Vec<f32>>) {
         self.occupancy_prob_map = grid;
+    }
+
+    pub fn get_cell_value(&self, world_x: f32, world_y: f32) -> Option<f32> {
+        let pos = self.convert_coordinate_to_index(world_x, world_y)?;
+        Some(self.occupancy_prob_map[pos.y as usize][pos.x as usize])
     }
 }
 
@@ -133,8 +139,9 @@ impl OccupancyMap {
     }
     
     pub(crate) fn update_cell(&mut self, x_idx: usize, y_idx: usize, did_collide: bool) {
-        let prob_update = if did_collide {UPDATE_IF_COLLISION} else {UPDATE_IF_FREE};
-        self.occupancy_prob_map[y_idx][x_idx] += prob_update;
+        let prob_update = if did_collide { UPDATE_IF_COLLISION } else { UPDATE_IF_FREE };
+        let new_value = self.occupancy_prob_map[y_idx][x_idx] + prob_update;
+        self.occupancy_prob_map[y_idx][x_idx] = new_value.clamp(0.0, MAX_CELL_VALUE);
     }
 
     fn is_within_bounds(&self, x_idx: usize, y_idx: usize) -> bool {

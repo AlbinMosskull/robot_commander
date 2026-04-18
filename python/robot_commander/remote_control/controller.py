@@ -14,6 +14,7 @@ from robot_commander.config import load as load_config
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
 from robot_commander.depth_processing.depth_capture import DepthCapture, rays_to_ends
+from robot_commander.sensor.range_reading import RangeReading
 import robot_commander.depth_processing.depth_capture as depth_capture_io
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
@@ -26,6 +27,7 @@ LOCALIZATION_LOST_THRESHOLD = 30
 _ESCAPE_POSITION = (0.1, 0.2)
 _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 _DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_depth_capture.npz"
+_MAX_RAY_LENGTH_M = 1.0
 
 
 @dataclass
@@ -46,6 +48,16 @@ class PlanPathFailure:
     origin_x: float
     origin_y: float
     occ_grid: np.ndarray = field(repr=False)
+
+
+def _clip_ray(ray: RangeReading, max_length_m: float) -> tuple[float, float, float, float, bool]:
+    dx = ray.end_x - ray.start_x
+    dy = ray.end_y - ray.start_y
+    length = (dx ** 2 + dy ** 2) ** 0.5
+    if length <= max_length_m:
+        return ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit
+    scale = max_length_m / length
+    return ray.start_x, ray.start_y, ray.start_x + dx * scale, ray.start_y + dy * scale, False
 
 
 class RemoteControl:
@@ -269,15 +281,29 @@ class RemoteControl:
                         agent_y=agent_pos.y,
                         heading=heading,
                         ultrasonic_min=ultrasonic_min,
+                        intrinsics=self._cone_intrinsics,
                     ),
                     _DEPTH_CAPTURE_PATH,
                 )
                 with self._occ_lock:
                     for ray in depth_rays:
                         try:
-                            self._occ_map.ray_update(ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit)
+                            self._occ_map.ray_update(*_clip_ray(ray, _MAX_RAY_LENGTH_M))
                         except Exception:
                             traceback.print_exc()
+                    closest_rays = sorted(
+                        depth_rays,
+                        key=lambda r: (r.end_x - agent_pos.x) ** 2 + (r.end_y - agent_pos.y) ** 2,
+                    )[:5]
+                    print(f"occ map — {len(depth_rays)} rays | 5 closest endpoints:")
+                    for ray in closest_rays:
+                        dist = ((ray.end_x - agent_pos.x) ** 2 + (ray.end_y - agent_pos.y) ** 2) ** 0.5
+                        value = self._occ_map.get_cell_value(ray.end_x, ray.end_y)
+                        if not value:
+                            print("Query for cell out of bounds")
+                            continue
+                        flag = " <-- CLEARED" if value is not None and value < 0.5 else ""
+                        print(f"  ({ray.end_x:.2f}, {ray.end_y:.2f}) dist={dist:.2f}m cell={value:.3f}{flag}")
             except Exception:
                 traceback.print_exc()
 

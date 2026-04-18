@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
+from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.sensor.range_reading import RangeReading
 
 
@@ -16,6 +17,7 @@ class DepthCapture:
     agent_y: float
     heading: float
     ultrasonic_min: float
+    intrinsics: Intrinsics
 
 
 def save(capture: DepthCapture, path: Path) -> None:
@@ -29,11 +31,21 @@ def save(capture: DepthCapture, path: Path) -> None:
         agent_y=capture.agent_y,
         heading=capture.heading,
         ultrasonic_min=capture.ultrasonic_min,
+        camera_matrix=capture.intrinsics.camera_matrix,
+        dist_coeffs=capture.intrinsics.dist_coeffs,
+        intrinsics_rms_error=capture.intrinsics.rms_error,
+        intrinsics_image_size=np.array(capture.intrinsics.image_size),
     )
 
 
 def load(path: Path) -> DepthCapture:
     data = np.load(path)
+    intrinsics = Intrinsics(
+        camera_matrix=data["camera_matrix"],
+        dist_coeffs=data["dist_coeffs"],
+        rms_error=float(data["intrinsics_rms_error"]),
+        image_size=tuple(data["intrinsics_image_size"].tolist()),
+    )
     return DepthCapture(
         frame=data["frame"],
         calibrated_depth=data["calibrated_depth"],
@@ -43,6 +55,7 @@ def load(path: Path) -> DepthCapture:
         agent_y=float(data["agent_y"]),
         heading=float(data["heading"]),
         ultrasonic_min=float(data["ultrasonic_min"]),
+        intrinsics=intrinsics,
     )
 
 
