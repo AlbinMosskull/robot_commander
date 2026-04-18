@@ -12,9 +12,9 @@ from robot_commander.filtering.kalman_filter import KalmanFilter
 from robot_commander.filtering.heading_filter import HeadingFilter
 from robot_commander.agent.adeept.hardware.Move import RaspClaws
 from robot_commander.agent.adeept.hardware import Ultra
+from robot_commander.agent.adeept.hardware.mpu6050_gyro import Mpu6050Gyro
 from robot_commander.agent.adeept.run_logger import RunLogger
 from robot_commander.agent.adeept.adeept_motion_model import (
-    OMEGA_MAX_RAD_S,
     WAYPOINT_THRESHOLD_M,
     normalize_angle,
     predict_displacement,
@@ -59,6 +59,7 @@ class AdeeptAgent(AbstractAgent):
         self._camera.configure(camera_config)
         self._camera.start()
 
+        self._gyro = Mpu6050Gyro()
         self._position_filter = _make_position_filter()
         self._heading_filter = HeadingFilter(
             initial_heading=0.0,
@@ -141,12 +142,8 @@ class AdeeptAgent(AbstractAgent):
                 current_y = float(self._position_filter.x[1])
                 dx, dy = predict_displacement(self._current_command, current_heading, _DT)
                 self._position_filter.predict(np.array([dx, dy]))
-                if self._current_command == "left":
-                    self._heading_filter.predict(OMEGA_MAX_RAD_S * _DT)
-                elif self._current_command == "right":
-                    self._heading_filter.predict(-OMEGA_MAX_RAD_S * _DT)
-                else:
-                    self._heading_filter.predict(0.0)
+                gyro_delta = self._gyro.z_angular_velocity_rad_s() * _DT
+                self._heading_filter.predict(gyro_delta)
                 if active_waypoints and active_idx < len(active_waypoints):
                     target_x, target_y = active_waypoints[active_idx]
                     heading_error_log = normalize_angle(
