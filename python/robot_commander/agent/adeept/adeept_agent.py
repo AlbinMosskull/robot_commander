@@ -240,7 +240,6 @@ class AdeeptAgent(AbstractAgent):
         direction = 1
         while not self._stop_event.is_set():
             self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, angle_deg)
-            self._robot.release_servo(_DEPTH_SENSOR_PAN_CHANNEL)
             time.sleep(_SWEEP_SETTLE_S)
             print(f"sweep {angle_deg:.0f}°", flush=True)
             distance_cm = Ultra.checkdist()
