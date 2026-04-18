@@ -23,7 +23,8 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 _ULTRA_HIT_THRESHOLD_CM = 190.0
 _SWEEP_RANGE_DEG = 45
 _SWEEP_STEP_DEG = 5
-_SWEEP_STEP_INTERVAL_S = 0.05
+_SWEEP_STEP_INTERVAL_S = 0.01
+_SWEEP_SETTLE_S = 0.05  # one full echo cycle at max range (2m round-trip ≈ 12ms)
 _HEADING_ENTRY_RAD = math.radians(15)
 _HEADING_EXIT_RAD = math.radians(30)
 _TICK_HZ = 10
@@ -239,6 +240,7 @@ class AdeeptAgent(AbstractAgent):
         direction = 1
         while not self._stop_event.is_set():
             self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, angle_deg)
+            time.sleep(_SWEEP_SETTLE_S)
             print(f"sweep {angle_deg:.0f}°", flush=True)
             distance_cm = Ultra.checkdist()
             if distance_cm < _ULTRA_HIT_THRESHOLD_CM:
