@@ -8,7 +8,7 @@ from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.sensor.range_reading import RangeReading
 
 _MIN_OBSTACLE_HEIGHT_M = 0.05
-_RANSAC_ITERATIONS = 500
+_RANSAC_ITERATIONS = 100
 _RANSAC_DISTANCE_THRESHOLD_M = 0.03
 
 

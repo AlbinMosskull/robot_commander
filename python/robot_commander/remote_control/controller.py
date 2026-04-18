@@ -119,12 +119,6 @@ class RemoteControl:
         self._depth_queue.put(None)
         if self._client is not None:
             self._client.close()
-        if self._agent_update_thread is not None:
-            self._agent_update_thread.join(timeout=2)
-        if self._agent_heading_thread is not None:
-            self._agent_heading_thread.join(timeout=2)
-        if self._depth_worker_thread is not None:
-            self._depth_worker_thread.join(timeout=2)
 
     @property
     def localization_miss_count(self) -> int:

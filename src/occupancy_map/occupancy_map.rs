@@ -127,8 +127,8 @@ impl OccupancyMap {
         let local_y = (world_y - self.origin_y).max(0.0);
 
         Position2d {
-            x: ((local_x / self.resolution) as usize).min(self.width) as isize,
-            y: ((local_y / self.resolution) as usize).min(self.height) as isize,
+            x: ((local_x / self.resolution) as usize).min(self.width-1) as isize,
+            y: ((local_y / self.resolution) as usize).min(self.height-1) as isize,
         }
     }
     

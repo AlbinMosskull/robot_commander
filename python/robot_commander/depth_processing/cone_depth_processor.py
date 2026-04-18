@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
+import cv2
 import numpy as np
 
 from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.image_processing.intrinsics import Intrinsics
 
-_MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Large-hf"
+_MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
 
 
 @dataclass(frozen=True)
@@ -19,11 +20,13 @@ class ConeDepthProcessor:
         intrinsics: Intrinsics,
         camera_T_sensor: np.ndarray,
         cone_geometry: ConeGeometry,
+        processing_width: int = 320,
     ) -> None:
         self._depth_processor = DepthProcessor(_MODEL)
         self._intrinsics = intrinsics
         self._camera_T_sensor = camera_T_sensor
         self._cone_geometry = cone_geometry
+        self._processing_width = processing_width
 
     def process(self, frame: np.ndarray, ultrasonic_min_reading: float) -> np.ndarray:
         calibrated_depth, _ = self.process_with_mask(frame, ultrasonic_min_reading)
@@ -42,7 +45,11 @@ class ConeDepthProcessor:
         return (raw_depth * scale).astype(np.float32), cone_mask
 
     def _get_raw_depth(self, frame: np.ndarray) -> np.ndarray:
-        return self._depth_processor.process(frame)
+        original_h, original_w = frame.shape[:2]
+        scale = self._processing_width / original_w
+        small = cv2.resize(frame, (self._processing_width, int(original_h * scale)))
+        small_depth = self._depth_processor.process(small)
+        return cv2.resize(small_depth, (original_w, original_h))
 
     def _to_sensor_frame(self, depth: np.ndarray) -> np.ndarray:
         height, width = depth.shape

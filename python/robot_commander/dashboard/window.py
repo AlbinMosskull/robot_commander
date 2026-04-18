@@ -48,8 +48,8 @@ def _build_localizer_and_depth_processor(
         camera_T_sensor=np.eye(4, dtype=np.float64),
         cone_geometry=cone_geometry,
     )
-    # return camera_localizer, depth_processor
-    return camera_localizer, None
+    return camera_localizer, depth_processor
+    # return camera_localizer, None
 
 
 class DashboardWindow(QMainWindow):
