@@ -227,11 +227,19 @@ class AdeeptAgent(AbstractAgent):
             )
 
     def _run_sweep(self) -> None:
+        try:
+            self._run_sweep_loop()
+        except Exception:
+            import traceback
+            traceback.print_exc()
+
+    def _run_sweep_loop(self) -> None:
         center = float(self._robot.init_angles[_DEPTH_SENSOR_PAN_CHANNEL])
         angle_deg = center
         direction = 1
         while not self._stop_event.is_set():
             self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, angle_deg)
+            print(f"sweep {angle_deg:.0f}°", flush=True)
             distance_cm = Ultra.checkdist()
             if distance_cm < _ULTRA_HIT_THRESHOLD_CM:
                 ray = self._servo_reading_to_ray(angle_deg, center, distance_cm / 100.0)
