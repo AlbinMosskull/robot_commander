@@ -51,6 +51,10 @@ class RunLogger:
             gyro_heading,
         ])
 
+    def _flush(self) -> None:
+        self._tick_file.flush()
+        self._obs_file.flush()
+
     def log_observation(
         self,
         observed_heading: float,
@@ -66,6 +70,7 @@ class RunLogger:
             observed_x, observed_y,
             pos_innovation_x, pos_innovation_y,
         ])
+        self._flush()
 
     def close(self) -> None:
         self._tick_file.close()
