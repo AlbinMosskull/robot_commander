@@ -13,6 +13,8 @@ from robot_commander import OccupancyMap, WorldPosition2d, plan_path_towards_goa
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
+from robot_commander.depth_processing.depth_capture import DepthCapture, rays_to_ends
+import robot_commander.depth_processing.depth_capture as depth_capture_io
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
@@ -23,6 +25,7 @@ _OCC_RESOLUTION = 0.05
 LOCALIZATION_LOST_THRESHOLD = 30
 _ESCAPE_POSITION = (0.1, 0.2)
 _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
+_DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_depth_capture.npz"
 
 
 @dataclass
@@ -251,10 +254,23 @@ class RemoteControl:
                 break
             frame, ultrasonic_min, agent_pos, heading = job
             try:
-                calibrated_depth = self._cone_depth_processor.process(frame, ultrasonic_min)
+                calibrated_depth, cone_mask = self._cone_depth_processor.process_with_mask(frame, ultrasonic_min)
                 depth_rays = depth_to_rays(
                     calibrated_depth, self._cone_intrinsics,
                     agent_pos.x, agent_pos.y, heading,
+                )
+                depth_capture_io.save(
+                    DepthCapture(
+                        frame=frame,
+                        calibrated_depth=calibrated_depth,
+                        cone_mask=cone_mask,
+                        ray_ends=rays_to_ends(depth_rays),
+                        agent_x=agent_pos.x,
+                        agent_y=agent_pos.y,
+                        heading=heading,
+                        ultrasonic_min=ultrasonic_min,
+                    ),
+                    _DEPTH_CAPTURE_PATH,
                 )
                 with self._occ_lock:
                     for ray in depth_rays:

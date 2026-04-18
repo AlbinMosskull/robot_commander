@@ -46,6 +46,11 @@ def get_cur_path():
 #    left_II  3 2 |  body  | 8 9  right_II
 #                 |        |
 #   left_III  5 4 |________| 6 7  right_III
+
+_CAMERA_PAN_CHANNEL = 12
+_CAMERA_TILT_CHANNEL = 13
+_DEPTH_SENSOR_PAN_CHANNEL = 14
+
 class RaspClaws(threading.Thread):
     def __init__(self, *args, **kwargs):
         super(RaspClaws, self).__init__(*args, **kwargs)
@@ -96,6 +101,8 @@ class RaspClaws(threading.Thread):
         self.step_wiggle = 15
         self.direction_command = 'no'
         self.init_all()
+        for channel in [_CAMERA_PAN_CHANNEL, _CAMERA_TILT_CHANNEL, _DEPTH_SENSOR_PAN_CHANNEL, 15]:
+            self.release_servo(channel)
         
     def pause(self):
         print('......................pause..........................')

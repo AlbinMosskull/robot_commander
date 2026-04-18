@@ -2,7 +2,6 @@ import math
 import threading
 import time
 
-import cv2
 import numpy as np
 from picamera2 import Picamera2
 
@@ -28,8 +27,6 @@ _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
 _CAMERA_WIDTH = 1920
 _CAMERA_HEIGHT = 1080
-_IDLE_SERVO_CHANNELS = [12, 13, 14, 15]
-
 
 def _make_position_filter() -> KalmanFilter:
     identity = np.eye(2)
@@ -49,8 +46,6 @@ class AdeeptAgent(AbstractAgent):
         self._robot = RaspClaws()
         self._robot.daemon = True
         self._robot.start()
-        for ch in _IDLE_SERVO_CHANNELS:
-            self._robot.release_servo(ch)
 
         self._camera = Picamera2()
         camera_config = self._camera.create_preview_configuration(
@@ -224,10 +219,7 @@ class AdeeptAgent(AbstractAgent):
         return []
 
     def GetCameraReading(self) -> np.ndarray | None:
-        frame = self._camera.capture_array()
-        if frame is None:
-            return None
-        return cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        return self._camera.capture_array()
 
     def GetHeading(self) -> float:
         with self._lock:

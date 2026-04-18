@@ -18,8 +18,7 @@ def main():
     frame = camera.capture_array()
     camera.stop()
 
-    bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    cv2.imwrite(str(args.output), bgr_frame)
+    cv2.imwrite(str(args.output), frame)
     print(f"Saved frame to {args.output}")
 
 
