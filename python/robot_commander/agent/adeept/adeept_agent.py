@@ -45,7 +45,7 @@ def _make_position_filter() -> KalmanFilter:
 
 
 class AdeeptAgent(AbstractAgent):
-    def __init__(self):
+    def __init__(self, escape_plan_enabled: bool = True):
         self._robot = RaspClaws()
         self._robot.daemon = True
         self._robot.start()
@@ -76,6 +76,7 @@ class AdeeptAgent(AbstractAgent):
         self._escape_plan_idx: int = 0
         self._last_remote_message_time: float = time.time()
 
+        self._escape_plan_enabled = escape_plan_enabled
         self._gyro_heading: float | None = None
         self._logger = RunLogger()
 
@@ -181,6 +182,8 @@ class AdeeptAgent(AbstractAgent):
             self._last_remote_message_time = time.time()
 
     def SetEscapePlan(self, waypoints: list[tuple[float, float]]) -> None:
+        if not self._escape_plan_enabled:
+            return
         with self._lock:
             self._escape_plan = list(waypoints)
             self._escape_plan_idx = 0
