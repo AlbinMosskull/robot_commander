@@ -99,6 +99,7 @@ def main():
         server.wait_for_termination()
     except KeyboardInterrupt:
         server.stop(grace=None)
+        agent.close()
 
 
 if __name__ == "__main__":

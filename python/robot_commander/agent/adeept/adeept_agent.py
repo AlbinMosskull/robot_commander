@@ -80,6 +80,7 @@ class AdeeptAgent(AbstractAgent):
         self._logger = RunLogger()
 
         self._raw_sensor = raw_sensor
+        self._stop_event = threading.Event()
         if raw_sensor:
             self._sweep_rays: list[RangeReading] = []
             self._sweep_lock = threading.Lock()
@@ -129,7 +130,7 @@ class AdeeptAgent(AbstractAgent):
         return waypoints, index
 
     def _tick_loop(self) -> None:
-        while True:
+        while not self._stop_event.is_set():
             with self._lock:
                 remote_timed_out = time.time() - self._last_remote_message_time > _REMOTE_TIMEOUT_S
                 if remote_timed_out and self._escape_plan:
@@ -229,7 +230,7 @@ class AdeeptAgent(AbstractAgent):
         center = float(self._robot.init_angles[_DEPTH_SENSOR_PAN_CHANNEL])
         angle_deg = center
         direction = 1
-        while True:
+        while not self._stop_event.is_set():
             self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, angle_deg)
             distance_cm = Ultra.checkdist()
             if distance_cm < _ULTRA_HIT_THRESHOLD_CM:
@@ -284,6 +285,19 @@ class AdeeptAgent(AbstractAgent):
         if distance_cm >= _ULTRA_HIT_THRESHOLD_CM:
             return None
         return distance_cm / 100.0
+
+    def close(self) -> None:
+        self._stop_event.set()
+        if self._raw_sensor:
+            center = float(self._robot.init_angles[_DEPTH_SENSOR_PAN_CHANNEL])
+            self._robot.set_servo_angle(_DEPTH_SENSOR_PAN_CHANNEL, center)
+            self._robot.release_servo(_DEPTH_SENSOR_PAN_CHANNEL)
+        self._robot.command_input("stand")
+        self._robot.cleanup()
+        self._camera.stop()
+        self._camera.close()
+        Ultra.sensor.close()
+        self._logger.close()
 
     def RunCommand(self, command: str, duration_s: float) -> None:
         with self._lock:
