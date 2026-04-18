@@ -256,10 +256,10 @@ class AdeeptAgent(AbstractAgent):
         heading = self.GetHeading()
         agent_x, agent_y = self.GetXandY()
         c, s = math.cos(heading), math.sin(heading)
-        start_x = agent_x + c * sensor_origin[0] - s * sensor_origin[1]
-        start_y = agent_y + s * sensor_origin[0] + c * sensor_origin[1]
-        hit_world_x = agent_x + c * hit_robot[0] - s * hit_robot[1]
-        hit_world_y = agent_y + s * hit_robot[0] + c * hit_robot[1]
+        start_x = agent_x + s * sensor_origin[0] + c * sensor_origin[2]
+        start_y = agent_y - c * sensor_origin[0] + s * sensor_origin[2]
+        hit_world_x = agent_x + s * hit_robot[0] + c * hit_robot[2]
+        hit_world_y = agent_y - c * hit_robot[0] + s * hit_robot[2]
         return RangeReading(start_x, start_y, hit_world_x, hit_world_y, did_hit=True)
 
     def GetSensorReading(self) -> list[RangeReading]:
