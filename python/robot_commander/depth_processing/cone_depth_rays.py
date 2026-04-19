@@ -10,13 +10,15 @@ from robot_commander.sensor.range_reading import RangeReading
 _MIN_OBSTACLE_HEIGHT_M = 0.05
 _RANSAC_ITERATIONS = 100
 _RANSAC_DISTANCE_THRESHOLD_M = 0.03
+_N_PLANES = 3
+_CAMERA_UP = np.array([0.0, -1.0, 0.0])
 
 
-def _detect_floor(points: np.ndarray) -> Plane | None:
-    planes = detect_planes(points, n_planes=1, n_iterations=_RANSAC_ITERATIONS, distance_threshold=_RANSAC_DISTANCE_THRESHOLD_M)
+def detect_floor(points: np.ndarray) -> Plane | None:
+    planes = detect_planes(points, n_planes=_N_PLANES, n_iterations=_RANSAC_ITERATIONS, distance_threshold=_RANSAC_DISTANCE_THRESHOLD_M)
     if not planes:
         return None
-    floor = planes[0]
+    floor = max(planes, key=lambda p: abs(float(p.normal @ _CAMERA_UP)))
     if floor.distance > 0:
         floor = Plane(-floor.normal, -floor.distance, floor.inliers)
     return floor
@@ -71,7 +73,7 @@ def depth_to_rays(
     if len(points) < 3:
         return []
 
-    floor = _detect_floor(points)
+    floor = detect_floor(points)
     if floor is None:
         return []
 

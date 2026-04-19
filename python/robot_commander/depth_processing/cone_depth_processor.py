@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+from robot_commander.depth_processing.cone_depth_rays import detect_floor
 from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.image_processing.intrinsics import Intrinsics
 
@@ -40,7 +41,10 @@ class ConeDepthProcessor:
         cone_mask = self._compute_cone_mask(raw_depth, sensor_points)
         if not cone_mask.any():
             raise ValueError("Cone mask is empty — no valid pixels in cone region")
-        cone_min_sensor_depth = self._find_cone_minimum_in_sensor_frame(raw_depth, cone_mask, sensor_points)
+        floor_mask = self._compute_floor_mask(raw_depth, cone_mask)
+        obstacle_mask = cone_mask & ~floor_mask
+        calibration_mask = obstacle_mask if obstacle_mask.any() else cone_mask
+        cone_min_sensor_depth = self._find_cone_minimum_in_sensor_frame(raw_depth, calibration_mask, sensor_points)
         scale = ultrasonic_min_reading / cone_min_sensor_depth
         return (raw_depth * scale).astype(np.float32), cone_mask
 
@@ -65,6 +69,20 @@ class ConeDepthProcessor:
             ones,
         ], axis=-1)
         return (camera_points @ self._camera_T_sensor.T)[..., :3]
+
+    def _compute_floor_mask(self, depth: np.ndarray, cone_mask: np.ndarray) -> np.ndarray:
+        height, width = depth.shape
+        col_grid, row_grid = np.meshgrid(np.arange(width, dtype=np.float64), np.arange(height, dtype=np.float64))
+        cone_depth = depth[cone_mask].astype(np.float64)
+        camera_x = (col_grid[cone_mask] - self._intrinsics.cx) * cone_depth / self._intrinsics.fx
+        camera_y = (row_grid[cone_mask] - self._intrinsics.cy) * cone_depth / self._intrinsics.fy
+        points = np.stack([camera_x, camera_y, cone_depth], axis=-1)
+        floor = detect_floor(points)
+        if floor is None:
+            return np.zeros(depth.shape, dtype=bool)
+        floor_mask = np.zeros(depth.shape, dtype=bool)
+        floor_mask[cone_mask] = floor.inliers
+        return floor_mask
 
     def _compute_cone_mask(self, depth: np.ndarray, sensor_points: np.ndarray) -> np.ndarray:
         sensor_z = sensor_points[..., 2]

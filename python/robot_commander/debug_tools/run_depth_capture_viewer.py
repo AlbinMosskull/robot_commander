@@ -35,6 +35,7 @@ def _show(
     depth_processor = _build_depth_processor(capture)
     calibrated_depth, cone_mask = depth_processor.process_with_mask(capture.frame, capture.ultrasonic_min)
 
+    print(f"Ultrasonic min reading: {capture.ultrasonic_min:.4f} m")
     print(f"agent: ({capture.agent_x:.4f}, {capture.agent_y:.4f})  heading: {capture.heading:.4f} rad")
     print(f"calibrated_depth range: [{calibrated_depth.min():.4f}, {calibrated_depth.max():.4f}] m")
     print(f"calibrated_depth (cone only) range: [{calibrated_depth[cone_mask].min():.4f}, {calibrated_depth[cone_mask].max():.4f}] m")
