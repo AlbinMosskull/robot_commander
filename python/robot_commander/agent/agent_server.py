@@ -43,6 +43,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         self._agent.RunCommand(request.command, request.duration_s)
         return agent_pb2.Empty()
 
+    def Scout(self, request, context):
+        self._agent.Scout()
+        return agent_pb2.Empty()
+
     def StreamAgentUpdate(self, request, context):
         while context.is_active():
             frame = self._agent.GetCameraReading()

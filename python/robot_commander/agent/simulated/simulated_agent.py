@@ -145,3 +145,6 @@ class SimulatedAgent(AbstractAgent):
 
     def RunCommand(self, command: str, duration_s: float) -> None:
         time.sleep(duration_s)
+
+    def Scout(self) -> None:
+        pass

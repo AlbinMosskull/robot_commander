@@ -22,6 +22,9 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
 _STAND_SETTLE_S = 0.5
+_SCOUT_OFFSET_RAD = math.radians(30)
+_SCOUT_DWELL_S = 2.0
+_SCOUT_HEADING_THRESHOLD_RAD = math.radians(5)
 _SWEEP_RANGE_DEG = 45
 _SWEEP_STEP_DEG = 5
 _SWEEP_STEP_INTERVAL_S = 0.01
@@ -31,8 +34,8 @@ _HEADING_EXIT_RAD = math.radians(30)
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
-_CAMERA_WIDTH = 1920
-_CAMERA_HEIGHT = 1080
+_CAMERA_WIDTH = 1944
+_CAMERA_HEIGHT = 2592
 
 def _make_position_filter() -> KalmanFilter:
     identity = np.eye(2)
@@ -316,6 +319,35 @@ class AdeeptAgent(AbstractAgent):
         self._camera.close()
         Ultra.sensor.close()
         self._logger.close()
+
+    def _rotate_to_heading(self, target_rad: float) -> None:
+        while True:
+            with self._lock:
+                error = normalize_angle(target_rad - self._heading_filter.heading)
+            if abs(error) < _SCOUT_HEADING_THRESHOLD_RAD:
+                break
+            command = "left" if error > 0 else "right"
+            with self._lock:
+                self._current_command = command
+                self._last_motion_time = time.time()
+            self._robot.command_input(command)
+            time.sleep(_DT)
+        with self._lock:
+            self._current_command = "stand"
+        self._robot.command_input("stand")
+
+    def Scout(self) -> None:
+        with self._lock:
+            self._manual_override = True
+            original_heading = self._heading_filter.heading
+        try:
+            for offset_rad in [_SCOUT_OFFSET_RAD, -_SCOUT_OFFSET_RAD]:
+                self._rotate_to_heading(normalize_angle(original_heading + offset_rad))
+                time.sleep(_SCOUT_DWELL_S)
+            self._rotate_to_heading(original_heading)
+        finally:
+            with self._lock:
+                self._manual_override = False
 
     def RunCommand(self, command: str, duration_s: float) -> None:
         with self._lock:

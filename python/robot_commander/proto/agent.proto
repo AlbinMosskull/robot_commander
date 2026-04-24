@@ -10,6 +10,7 @@ service AgentControl {
   rpc StreamPosition (Empty) returns (stream Position);
   rpc StreamAgentUpdate (Empty) returns (stream AgentUpdate);
   rpc RunCommand (CommandRequest) returns (Empty);
+  rpc Scout (Empty) returns (Empty);
 }
 
 message Path {

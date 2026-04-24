@@ -22,7 +22,7 @@ from robot_commander.localization.world_localizer import WorldLocalizer, WorldPo
 from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 
-_PATH_COLLISION_MARGIN = 0.3
+_PATH_COLLISION_MARGIN = 0.1
 _OCC_RESOLUTION = 0.05
 LOCALIZATION_LOST_THRESHOLD = 30
 _ESCAPE_POSITION = (0.1, 0.2)

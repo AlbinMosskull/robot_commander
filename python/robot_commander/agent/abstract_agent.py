@@ -30,3 +30,6 @@ class AbstractAgent(ABC):
 
     @abstractmethod
     def RunCommand(self, command: str, duration_s: float) -> None: ...
+
+    @abstractmethod
+    def Scout(self) -> None: ...

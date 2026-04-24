@@ -1,4 +1,5 @@
 import math
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -115,6 +116,8 @@ class DashboardWindow(QMainWindow):
     def keyPressEvent(self, event) -> None:
         if event.key() == Qt.Key.Key_Q:
             self._controller.set_offset_waypoint(math.pi / 2, 0.20)
+        elif event.key() == Qt.Key.Key_S and self._client is not None:
+            threading.Thread(target=self._client.scout, daemon=True).start()
         super().keyPressEvent(event)
 
     def showEvent(self, event) -> None:

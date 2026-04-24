@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import robot_commander.proto.agent_pb2 as agent__pb2
+from robot_commander.proto import agent_pb2 as agent__pb2
 
 GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
@@ -69,6 +69,11 @@ class AgentControlStub(object):
                 request_serializer=agent__pb2.CommandRequest.SerializeToString,
                 response_deserializer=agent__pb2.Empty.FromString,
                 _registered_method=True)
+        self.Scout = channel.unary_unary(
+                '/agent.AgentControl/Scout',
+                request_serializer=agent__pb2.Empty.SerializeToString,
+                response_deserializer=agent__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class AgentControlServicer(object):
@@ -116,6 +121,12 @@ class AgentControlServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Scout(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentControlServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -152,6 +163,11 @@ def add_AgentControlServicer_to_server(servicer, server):
             'RunCommand': grpc.unary_unary_rpc_method_handler(
                     servicer.RunCommand,
                     request_deserializer=agent__pb2.CommandRequest.FromString,
+                    response_serializer=agent__pb2.Empty.SerializeToString,
+            ),
+            'Scout': grpc.unary_unary_rpc_method_handler(
+                    servicer.Scout,
+                    request_deserializer=agent__pb2.Empty.FromString,
                     response_serializer=agent__pb2.Empty.SerializeToString,
             ),
     }
@@ -343,6 +359,33 @@ class AgentControl(object):
             target,
             '/agent.AgentControl/RunCommand',
             agent__pb2.CommandRequest.SerializeToString,
+            agent__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Scout(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/agent.AgentControl/Scout',
+            agent__pb2.Empty.SerializeToString,
             agent__pb2.Empty.FromString,
             options,
             channel_credentials,
