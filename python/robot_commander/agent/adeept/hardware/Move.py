@@ -95,7 +95,7 @@ class RaspClaws(threading.Thread):
         self.head_rotate_internal = 0.05
         self.rotate_internal = 0.0
         self.height_change = 10
-        self.step_internal = 0.13
+        self.step_internal = 0.2
         # self.step_internal = 0
         self.step_wiggle = 15
         self.direction_command = 'no'
