@@ -93,8 +93,7 @@ class RaspClaws(threading.Thread):
         self.steadyMode = 0
         self.move_status = False
         self.head_rotate_internal = 0.05
-        self.rotate_internal = 0
-        # self.rotate_internal = 0.01
+        self.rotate_internal = 0.01
         self.height_change = 10
         self.step_internal = 0.13
         # self.step_internal = 0
@@ -141,6 +140,8 @@ class RaspClaws(threading.Thread):
             self.servos[channel].angle = angle
             time.sleep(self.rotate_internal)
             self.last_angles[channel] = angle
+            self.servos[channel].angle = None
+
 
     def body_reset(self):
         self.last_angles= copy.deepcopy(self.init_angles)
