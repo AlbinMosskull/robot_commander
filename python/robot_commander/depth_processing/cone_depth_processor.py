@@ -8,6 +8,7 @@ from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.image_processing.intrinsics import Intrinsics
 
 _MODEL = "depth-anything/Depth-Anything-V2-Metric-Indoor-Base-hf"
+_CALIBRATION_PERCENTILE = 5.0
 
 
 @dataclass(frozen=True)
@@ -22,12 +23,14 @@ class ConeDepthProcessor:
         camera_T_sensor: np.ndarray,
         cone_geometry: ConeGeometry,
         processing_width: int = 320,
+        floor_height_threshold_m: float = 0.03,
     ) -> None:
         self._depth_processor = DepthProcessor(_MODEL)
         self._intrinsics = intrinsics
         self._camera_T_sensor = camera_T_sensor
         self._cone_geometry = cone_geometry
         self._processing_width = processing_width
+        self._floor_height_threshold_m = floor_height_threshold_m
 
     def process(self, frame: np.ndarray, ultrasonic_min_reading: float) -> np.ndarray:
         calibrated_depth, _ = self.process_with_mask(frame, ultrasonic_min_reading)
@@ -44,8 +47,7 @@ class ConeDepthProcessor:
         floor_mask = self._compute_floor_mask(raw_depth, cone_mask)
         obstacle_mask = cone_mask & ~floor_mask
         calibration_mask = obstacle_mask if obstacle_mask.any() else cone_mask
-        cone_min_sensor_depth = self._find_cone_minimum_in_sensor_frame(raw_depth, calibration_mask, sensor_points)
-        scale = ultrasonic_min_reading / cone_min_sensor_depth
+        scale = ultrasonic_min_reading / self._find_calibration_depth(raw_depth, calibration_mask)
         return (raw_depth * scale).astype(np.float32), cone_mask
 
     def _get_raw_depth(self, frame: np.ndarray) -> np.ndarray:
@@ -80,8 +82,9 @@ class ConeDepthProcessor:
         floor = detect_floor(points)
         if floor is None:
             return np.zeros(depth.shape, dtype=bool)
+        heights = points @ floor.normal - floor.distance
         floor_mask = np.zeros(depth.shape, dtype=bool)
-        floor_mask[cone_mask] = floor.inliers
+        floor_mask[cone_mask] = heights < self._floor_height_threshold_m
         return floor_mask
 
     def _compute_cone_mask(self, depth: np.ndarray, sensor_points: np.ndarray) -> np.ndarray:
@@ -90,12 +93,6 @@ class ConeDepthProcessor:
         polar_angle = np.arctan2(radial, sensor_z)
         return (depth > 0) & (sensor_z > 0) & (polar_angle < self._cone_geometry.half_angle_radians)
 
-    def _find_cone_minimum_in_sensor_frame(
-        self,
-        depth: np.ndarray,
-        cone_mask: np.ndarray,
-        sensor_points: np.ndarray,
-    ) -> float:
-        masked_depth = np.where(cone_mask, depth, np.inf)
-        row, col = np.unravel_index(np.argmin(masked_depth), depth.shape)
-        return float(sensor_points[row, col, 2])
+    def _find_calibration_depth(self, depth: np.ndarray, mask: np.ndarray) -> float:
+        valid = depth[mask & (depth > 0)]
+        return float(np.percentile(valid, _CALIBRATION_PERCENTILE))

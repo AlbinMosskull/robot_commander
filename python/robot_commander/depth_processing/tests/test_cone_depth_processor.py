@@ -22,6 +22,7 @@ def _make_processor(
     cy: float = 240.0,
     camera_T_sensor: np.ndarray | None = None,
     half_angle_degrees: float = 30.0,
+    floor_height_threshold_m: float = 0.03,
 ) -> ConeDepthProcessor:
     if camera_T_sensor is None:
         camera_T_sensor = np.eye(4)
@@ -33,6 +34,7 @@ def _make_processor(
         processor._intrinsics = intrinsics
         processor._camera_T_sensor = camera_T_sensor
         processor._cone_geometry = cone
+        processor._floor_height_threshold_m = floor_height_threshold_m
     return processor
 
 
@@ -89,4 +91,60 @@ def test_scale_with_translation_requires_rescaling():
     with patch.object(processor, "_get_raw_depth", return_value=flat_depth):
         result = processor.process(frame=np.zeros((480, 640, 3), dtype=np.uint8), ultrasonic_min_reading=5.0)
     np.testing.assert_allclose(result, flat_depth * 2.0, atol=1e-5)
+
+
+def _make_floor_cone_mask(depth: np.ndarray, processor: ConeDepthProcessor) -> np.ndarray:
+    return np.ones(depth.shape, dtype=bool)
+
+
+def test_floor_mask_filters_points_at_floor_level():
+    processor = _make_processor(
+        fx=500.0, fy=500.0, cx=5.0, cy=5.0,
+        half_angle_degrees=90.0,
+        floor_height_threshold_m=0.03,
+    )
+    depth = np.ones((10, 10), dtype=np.float32)
+    cone_mask = np.ones(depth.shape, dtype=bool)
+    # Floor plane z=1: all points at depth=1 have height = z - 0.98 = 0.02m < 0.03m threshold
+    floor_normal = np.array([0.0, 0.0, 1.0])
+
+    from robot_commander.depth_processing.ransac import Plane
+    floor = Plane(normal=floor_normal, distance=0.98, inliers=np.ones(cone_mask.sum(), dtype=bool))
+
+    with patch("robot_commander.depth_processing.cone_depth_processor.detect_floor", return_value=floor):
+        mask = processor._compute_floor_mask(depth, cone_mask)
+
+    assert mask.all(), "all points are within 3 cm of floor and should be masked"
+
+
+def test_floor_mask_keeps_points_above_threshold():
+    processor = _make_processor(
+        fx=500.0, fy=500.0, cx=5.0, cy=5.0,
+        half_angle_degrees=90.0,
+        floor_height_threshold_m=0.03,
+    )
+    depth = np.ones((10, 10), dtype=np.float32)
+    cone_mask = np.ones(depth.shape, dtype=bool)
+    # Floor normal pointing up in camera space (y=-1 is up), floor at y=2.0 (below all depth=1 points)
+    floor_normal = np.array([0.0, -1.0, 0.0])
+
+    from robot_commander.depth_processing.ransac import Plane
+    # distance chosen so height of points = camera_y - distance > threshold for center pixel
+    floor = Plane(normal=floor_normal, distance=-2.0, inliers=np.ones(cone_mask.sum(), dtype=bool))
+
+    with patch("robot_commander.depth_processing.cone_depth_processor.detect_floor", return_value=floor):
+        mask = processor._compute_floor_mask(depth, cone_mask)
+
+    assert not mask[5, 5], "center pixel is well above threshold and should not be in floor mask"
+
+
+def test_floor_mask_empty_when_no_floor_detected():
+    processor = _make_processor(half_angle_degrees=90.0)
+    depth = np.ones((10, 10), dtype=np.float32)
+    cone_mask = np.ones(depth.shape, dtype=bool)
+
+    with patch("robot_commander.depth_processing.cone_depth_processor.detect_floor", return_value=None):
+        mask = processor._compute_floor_mask(depth, cone_mask)
+
+    assert not mask.any()
 

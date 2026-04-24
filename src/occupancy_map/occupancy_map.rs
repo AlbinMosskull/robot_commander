@@ -57,6 +57,56 @@ impl OccupancyMap {
         }
     }
 
+    pub fn ray_update_gaussian(
+        &mut self,
+        start_world_x: f32,
+        start_world_y: f32,
+        end_world_x: f32,
+        end_world_y: f32,
+        sigma_m: f32,
+    ) {
+        let hit_dist = ((end_world_x - start_world_x).powi(2) + (end_world_y - start_world_y).powi(2)).sqrt();
+        if hit_dist == 0.0 {
+            return;
+        }
+
+        let dir_x = (end_world_x - start_world_x) / hit_dist;
+        let dir_y = (end_world_y - start_world_y) / hit_dist;
+        let tail = 3.0 * sigma_m;
+
+        let start_grid = match self.convert_coordinate_to_index(start_world_x, start_world_y) {
+            Some(p) => p,
+            None => return,
+        };
+        let ext_end_grid = self.convert_and_clip_coordinate_to_index(
+            end_world_x + dir_x * tail,
+            end_world_y + dir_y * tail,
+        );
+
+        for (x_idx, y_idx) in bresenham((start_grid.x, start_grid.y), (ext_end_grid.x, ext_end_grid.y)) {
+            let cell_world_x = x_idx as f32 * self.resolution + self.origin_x + self.resolution * 0.5;
+            let cell_world_y = y_idx as f32 * self.resolution + self.origin_y + self.resolution * 0.5;
+            let dist_along_ray = (cell_world_x - start_world_x) * dir_x + (cell_world_y - start_world_y) * dir_y;
+
+            let delta = if dist_along_ray < hit_dist - tail {
+                UPDATE_IF_FREE
+            } else if dist_along_ray <= hit_dist + tail {
+                let diff = dist_along_ray - hit_dist;
+                let weight = (-0.5 * (diff / sigma_m).powi(2)).exp();
+                weight * UPDATE_IF_COLLISION
+            } else {
+                break;
+            };
+
+            let x = x_idx as usize;
+            let y = y_idx as usize;
+            if x < self.width && y < self.height {
+                let new_value = self.occupancy_prob_map[y][x] + delta;
+                self.occupancy_prob_map[y][x] = new_value.clamp(0.0, MAX_CELL_VALUE);
+            }
+        }
+    }
+
     pub fn is_valid_coordinate(&self, x: f32, y: f32, collision_margin: f32) -> bool {
         self.convert_coordinate_to_index(x, y)
             .map(|position| self.is_valid_index(position, collision_margin))
@@ -210,5 +260,31 @@ mod tests {
         occ_map.ray_update(0.05, 0.05, 0.05, 0.35, true);
         assert!(!occ_map.is_valid_coordinate(0.05, 0.35, 0.0));
         assert!(occ_map.is_valid_coordinate(0.05, 0.05, 0.0));
+    }
+
+    #[test]
+    fn ray_update_gaussian_raises_hit_cell_above_default() {
+        let mut occ_map = OccupancyMap::new(20, 20, 0.1, 0.0, 0.0);
+        occ_map.ray_update_gaussian(0.05, 0.05, 0.05, 0.65, 0.05);
+        let grid = occ_map.get_grid();
+        assert!(grid[6][0] > DEFAULT_UNCERTAINTY, "Hit cell should be above default uncertainty");
+    }
+
+    #[test]
+    fn ray_update_gaussian_marks_free_cells_before_hit() {
+        let mut occ_map = OccupancyMap::new(20, 20, 0.1, 0.0, 0.0);
+        occ_map.ray_update_gaussian(0.05, 0.05, 0.05, 0.65, 0.05);
+        let grid = occ_map.get_grid();
+        assert!(grid[1][0] < DEFAULT_UNCERTAINTY, "Cell well before hit should be marked free");
+    }
+
+    #[test]
+    fn ray_update_gaussian_hit_cell_higher_than_shoulder() {
+        let mut occ_map = OccupancyMap::new(20, 20, 0.1, 0.0, 0.0);
+        occ_map.ray_update_gaussian(0.05, 0.05, 0.05, 0.65, 0.05);
+        let grid = occ_map.get_grid();
+        // Cell at exact hit (row 6) should be higher than cells at shoulders (rows 4, 8)
+        assert!(grid[6][0] > grid[4][0]);
+        assert!(grid[6][0] > grid[8][0]);
     }
 }

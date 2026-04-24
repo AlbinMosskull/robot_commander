@@ -21,6 +21,7 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 )
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
+_STAND_SETTLE_S = 0.5
 _SWEEP_RANGE_DEG = 45
 _SWEEP_STEP_DEG = 5
 _SWEEP_STEP_INTERVAL_S = 0.01
@@ -78,6 +79,7 @@ class AdeeptAgent(AbstractAgent):
 
         self._escape_plan_enabled = escape_plan_enabled
         self._gyro_heading: float | None = None
+        self._last_motion_time: float = 0.0
         self._logger = RunLogger()
 
         self._raw_sensor = raw_sensor
@@ -127,6 +129,7 @@ class AdeeptAgent(AbstractAgent):
             command = "left" if heading_error > 0 else "right"
 
         self._current_command = command
+        self._last_motion_time = time.time()
         self._robot.command_input(command)
         return waypoints, index
 
@@ -291,6 +294,11 @@ class AdeeptAgent(AbstractAgent):
     def GetUltrasonicMin(self) -> float | None:
         if self._raw_sensor:
             return None
+        with self._lock:
+            if self._current_command != "stand":
+                return None
+            if time.time() - self._last_motion_time < _STAND_SETTLE_S:
+                return None
         distance_cm = Ultra.checkdist()
         if distance_cm >= _ULTRA_HIT_THRESHOLD_CM:
             return None
@@ -312,6 +320,7 @@ class AdeeptAgent(AbstractAgent):
     def RunCommand(self, command: str, duration_s: float) -> None:
         with self._lock:
             self._manual_override = True
+            self._last_motion_time = time.time()
         try:
             self._robot.command_input(command)
             time.sleep(duration_s)

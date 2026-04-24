@@ -5,6 +5,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
+from datetime import datetime
 
 import cv2
 import numpy as np
@@ -27,7 +28,9 @@ LOCALIZATION_LOST_THRESHOLD = 30
 _ESCAPE_POSITION = (0.1, 0.2)
 _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 _DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_depth_capture.npz"
-_MAX_RAY_LENGTH_M = 1.0
+_LOGS_DIR = Path(__file__).parent.parent / "debug_tools" / "logs"
+_DEPTH_RAY_RANGE_FACTOR = 1.5
+_GAUSSIAN_SIGMA_M = 0.05
 
 
 @dataclass
@@ -108,6 +111,8 @@ class RemoteControl:
         self._agent_heading_thread: threading.Thread | None = None
         self._depth_worker_thread: threading.Thread | None = None
         self._depth_queue: queue.Queue = queue.Queue(maxsize=1)
+        self._depth_captures_dir: Path = _LOGS_DIR / datetime.now().strftime("%Y%m%dT%H%M%S") / "depth_captures"
+        self._depth_captures_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def map_coords(self) -> MapCoordinates:
@@ -271,24 +276,28 @@ class RemoteControl:
                     calibrated_depth, self._cone_intrinsics,
                     agent_pos.x, agent_pos.y, heading,
                 )
-                depth_capture_io.save(
-                    DepthCapture(
-                        frame=frame,
-                        calibrated_depth=calibrated_depth,
-                        cone_mask=cone_mask,
-                        ray_ends=rays_to_ends(depth_rays),
-                        agent_x=agent_pos.x,
-                        agent_y=agent_pos.y,
-                        heading=heading,
-                        ultrasonic_min=ultrasonic_min,
-                        intrinsics=self._cone_intrinsics,
-                    ),
-                    _DEPTH_CAPTURE_PATH,
+                capture = DepthCapture(
+                    frame=frame,
+                    calibrated_depth=calibrated_depth,
+                    cone_mask=cone_mask,
+                    ray_ends=rays_to_ends(depth_rays),
+                    agent_x=agent_pos.x,
+                    agent_y=agent_pos.y,
+                    heading=heading,
+                    ultrasonic_min=ultrasonic_min,
+                    intrinsics=self._cone_intrinsics,
                 )
+                depth_capture_io.save(capture, _DEPTH_CAPTURE_PATH)
+                depth_capture_io.save(capture, self._depth_captures_dir / f"{time.monotonic():.3f}.npz")
+                max_ray_m = _DEPTH_RAY_RANGE_FACTOR * ultrasonic_min
                 with self._occ_lock:
                     for ray in depth_rays:
                         try:
-                            self._occ_map.ray_update(*_clip_ray(ray, _MAX_RAY_LENGTH_M))
+                            start_x, start_y, end_x, end_y, did_hit = _clip_ray(ray, max_ray_m)
+                            if did_hit:
+                                self._occ_map.ray_update_gaussian(start_x, start_y, end_x, end_y, _GAUSSIAN_SIGMA_M)
+                            else:
+                                self._occ_map.ray_update(start_x, start_y, end_x, end_y, False)
                         except Exception:
                             traceback.print_exc()
                     closest_rays = sorted(
