@@ -34,8 +34,8 @@ _HEADING_EXIT_RAD = math.radians(30)
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
-_CAMERA_WIDTH = 1944
-_CAMERA_HEIGHT = 2592
+_CAMERA_WIDTH = 2592
+_CAMERA_HEIGHT = 1944
 
 def _make_position_filter() -> KalmanFilter:
     identity = np.eye(2)
