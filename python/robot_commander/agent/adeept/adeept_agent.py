@@ -22,8 +22,8 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
 _STAND_SETTLE_S = 0.5
-_SCOUT_OFFSET_RAD = math.radians(30)
-_SCOUT_DWELL_S = 2.0
+_SCOUT_OFFSETS_RAD = [math.radians(d) for d in (-30, -15, 0, 15, 30)]
+_SCOUT_DWELL_S = 5.0
 _SCOUT_HEADING_THRESHOLD_RAD = math.radians(5)
 _SWEEP_RANGE_DEG = 45
 _SWEEP_STEP_DEG = 5
@@ -341,7 +341,7 @@ class AdeeptAgent(AbstractAgent):
             self._manual_override = True
             original_heading = self._heading_filter.heading
         try:
-            for offset_rad in [_SCOUT_OFFSET_RAD, -_SCOUT_OFFSET_RAD]:
+            for offset_rad in _SCOUT_OFFSETS_RAD:
                 self._rotate_to_heading(normalize_angle(original_heading + offset_rad))
                 time.sleep(_SCOUT_DWELL_S)
             self._rotate_to_heading(original_heading)

@@ -25,7 +25,7 @@ map:
   stencil_path: plots/output/stencil_map.json
 
 localization:
-  heading_offset_deg: 84.6
+  heading_offset_deg: 70
 
 depth:
   cone_half_angle_deg: 15.0

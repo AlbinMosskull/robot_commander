@@ -15,7 +15,7 @@ from robot_commander.config import load as load_config
 _cfg = load_config()
 _SAMPLE_COUNT = 10
 _SAMPLE_INTERVAL_S = 0.1
-_FORWARD_DURATION_S = 3.0
+_FORWARD_DURATION_S = 4.0
 _ROTATE_DURATION_S = 4.0
 _SETTLE_S = 0.5
 

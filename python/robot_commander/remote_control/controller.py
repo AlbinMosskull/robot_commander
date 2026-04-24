@@ -10,7 +10,7 @@ from datetime import datetime
 import cv2
 import numpy as np
 
-from robot_commander import OccupancyMap, WorldPosition2d, plan_path_towards_goal
+from robot_commander import OccupancyMap, WorldPosition2d, plan_path_towards_goal_theta_star
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
@@ -239,7 +239,7 @@ class RemoteControl:
 
     def _plan_path(self, start: WorldPosition2d, goal: WorldPosition2d, failure_filename: str) -> list[tuple[float, float]] | None:
         with self._occ_lock:
-            result = plan_path_towards_goal(self._occ_map, start, goal, _PATH_COLLISION_MARGIN)
+            result = plan_path_towards_goal_theta_star(self._occ_map, start, goal, _PATH_COLLISION_MARGIN)
             if result is None:
                 failure = PlanPathFailure(
                     start=start,
