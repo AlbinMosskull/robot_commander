@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QMainWindow, QVBoxLayout, QWidget
 from robot_commander.config import load as load_config
 from robot_commander.dashboard.agent_camera import AgentCamera
 from robot_commander.dashboard.camera_widget import CameraWidget
+from robot_commander.dashboard.depth_widget import DepthWidget
 from robot_commander.dashboard.map_widget import MapWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
 from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
@@ -100,9 +101,11 @@ class DashboardWindow(QMainWindow):
 
         self._cam_pov_widget = CameraWidget(camera_pov, "POV CAMERA (CAM-01)")
         self._cam_overhead_widget = CameraWidget(camera_overhead, "OVERHEAD ANGLE (CAM-02)")
+        self._depth_widget = DepthWidget(self._controller)
 
         right_layout.addWidget(self._cam_pov_widget, stretch=1)
         right_layout.addWidget(self._cam_overhead_widget, stretch=1)
+        right_layout.addWidget(self._depth_widget, stretch=1)
 
         main_layout.addWidget(self._map_widget, stretch=3)
         main_layout.addWidget(right_panel, stretch=2)

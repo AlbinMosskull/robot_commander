@@ -93,15 +93,15 @@ class RaspClaws(threading.Thread):
         self.steadyMode = 0
         self.move_status = False
         self.head_rotate_internal = 0.05
-        self.rotate_internal = 0.01
+        self.rotate_internal = 0.0
         self.height_change = 10
         self.step_internal = 0.13
         # self.step_internal = 0
         self.step_wiggle = 15
         self.direction_command = 'no'
         self.init_all()
-        # for channel in [_CAMERA_PAN_CHANNEL, _CAMERA_TILT_CHANNEL, _DEPTH_SENSOR_PAN_CHANNEL, 15]:
-        #     self.release_servo(channel)
+        for channel in [_CAMERA_PAN_CHANNEL, _CAMERA_TILT_CHANNEL, _DEPTH_SENSOR_PAN_CHANNEL, 15]:
+            self.release_servo(channel)
         
     def pause(self):
         print('......................pause..........................')
@@ -140,7 +140,6 @@ class RaspClaws(threading.Thread):
             self.servos[channel].angle = angle
             time.sleep(self.rotate_internal)
             self.last_angles[channel] = angle
-            self.servos[channel].angle = None
 
 
     def body_reset(self):

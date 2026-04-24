@@ -30,7 +30,7 @@ _FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
 _DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_depth_capture.npz"
 _LOGS_DIR = Path(__file__).parent.parent / "debug_tools" / "logs"
 _DEPTH_RAY_RANGE_FACTOR = 1.5
-_GAUSSIAN_SIGMA_M = 0.05
+_GAUSSIAN_SIGMA_M = 0.01
 
 
 @dataclass
@@ -113,6 +113,13 @@ class RemoteControl:
         self._depth_queue: queue.Queue = queue.Queue(maxsize=1)
         self._depth_captures_dir: Path = _LOGS_DIR / datetime.now().strftime("%Y%m%dT%H%M%S") / "depth_captures"
         self._depth_captures_dir.mkdir(parents=True, exist_ok=True)
+        self._latest_depth_capture: DepthCapture | None = None
+        self._depth_capture_lock = threading.Lock()
+
+    @property
+    def latest_depth_capture(self) -> DepthCapture | None:
+        with self._depth_capture_lock:
+            return self._latest_depth_capture
 
     @property
     def map_coords(self) -> MapCoordinates:
@@ -289,6 +296,8 @@ class RemoteControl:
                 )
                 depth_capture_io.save(capture, _DEPTH_CAPTURE_PATH)
                 depth_capture_io.save(capture, self._depth_captures_dir / f"{time.monotonic():.3f}.npz")
+                with self._depth_capture_lock:
+                    self._latest_depth_capture = capture
                 max_ray_m = _DEPTH_RAY_RANGE_FACTOR * ultrasonic_min
                 with self._occ_lock:
                     for ray in depth_rays:
@@ -304,15 +313,12 @@ class RemoteControl:
                         depth_rays,
                         key=lambda r: (r.end_x - agent_pos.x) ** 2 + (r.end_y - agent_pos.y) ** 2,
                     )[:5]
-                    print(f"occ map — {len(depth_rays)} rays | 5 closest endpoints:")
                     for ray in closest_rays:
                         dist = ((ray.end_x - agent_pos.x) ** 2 + (ray.end_y - agent_pos.y) ** 2) ** 0.5
                         value = self._occ_map.get_cell_value(ray.end_x, ray.end_y)
                         if not value:
-                            print("Query for cell out of bounds")
                             continue
                         flag = " <-- CLEARED" if value is not None and value < 0.5 else ""
-                        print(f"  ({ray.end_x:.2f}, {ray.end_y:.2f}) dist={dist:.2f}m cell={value:.3f}{flag}")
             except Exception:
                 traceback.print_exc()
 
