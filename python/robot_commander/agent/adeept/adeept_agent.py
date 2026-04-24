@@ -21,9 +21,9 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 )
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
-_STAND_SETTLE_S = 0.5
-_SCOUT_OFFSETS_RAD = [math.radians(d) for d in (-30, -15, 0, 15, 30)]
-_SCOUT_DWELL_S = 5.0
+_STAND_SETTLE_S = 2.0
+_SCOUT_OFFSETS_RAD = [math.radians(d) for d in (-30, 30)]
+_SCOUT_DWELL_S = 7.0
 _SCOUT_HEADING_THRESHOLD_RAD = math.radians(5)
 _SWEEP_RANGE_DEG = 45
 _SWEEP_STEP_DEG = 5
