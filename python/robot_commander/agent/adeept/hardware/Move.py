@@ -100,8 +100,8 @@ class RaspClaws(threading.Thread):
         self.step_wiggle = 15
         self.direction_command = 'no'
         self.init_all()
-        for channel in [_CAMERA_PAN_CHANNEL, _CAMERA_TILT_CHANNEL, _DEPTH_SENSOR_PAN_CHANNEL, 15]:
-            self.release_servo(channel)
+        # for channel in [_CAMERA_PAN_CHANNEL, _CAMERA_TILT_CHANNEL, _DEPTH_SENSOR_PAN_CHANNEL, 15]:
+        #     self.release_servo(channel)
         
     def pause(self):
         print('......................pause..........................')
