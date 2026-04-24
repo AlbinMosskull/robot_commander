@@ -31,6 +31,7 @@ _DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_dep
 _LOGS_DIR = Path(__file__).parent.parent / "debug_tools" / "logs"
 _DEPTH_RAY_RANGE_FACTOR = 1.5
 _GAUSSIAN_SIGMA_M = 0.01
+_INITIAL_FREE_RADIUS_M = 0.3
 
 
 @dataclass
@@ -102,6 +103,7 @@ class RemoteControl:
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
+        self._robot_first_detected: bool = False
         self._pos_lock = threading.Lock()
         self._agent_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
@@ -183,6 +185,10 @@ class RemoteControl:
                 self._localization_miss_count = min(
                     self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
                 )
+        if pose is not None and not self._robot_first_detected:
+            with self._occ_lock:
+                self._occ_map.mark_free_radius(pose.x, pose.y, _INITIAL_FREE_RADIUS_M)
+            self._robot_first_detected = True
         if pose is not None and self._client is not None:
             self._client.observe_position(pose.x, pose.y, pose.heading, confidence=1.0)
             escape_path = self._plan_path(WorldPosition2d(pose.x, pose.y), WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz")

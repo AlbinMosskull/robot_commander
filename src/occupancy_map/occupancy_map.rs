@@ -129,6 +129,30 @@ impl OccupancyMap {
         let pos = self.convert_coordinate_to_index(world_x, world_y)?;
         Some(self.occupancy_prob_map[pos.y as usize][pos.x as usize])
     }
+
+    pub fn mark_free_radius(&mut self, world_x: f32, world_y: f32, radius_m: f32) {
+        let center = match self.convert_coordinate_to_index(world_x, world_y) {
+            Some(p) => p,
+            None => return,
+        };
+        let radius_cells = (radius_m / self.resolution).ceil() as isize;
+
+        for dy in -radius_cells..=radius_cells {
+            for dx in -radius_cells..=radius_cells {
+                let cell_world_x = (center.x + dx) as f32 * self.resolution + self.origin_x;
+                let cell_world_y = (center.y + dy) as f32 * self.resolution + self.origin_y;
+                let dist_sq = (cell_world_x - world_x).powi(2) + (cell_world_y - world_y).powi(2);
+                if dist_sq > radius_m * radius_m {
+                    continue;
+                }
+                let x = center.x + dx;
+                let y = center.y + dy;
+                if x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height {
+                    self.occupancy_prob_map[y as usize][x as usize] = 0.0;
+                }
+            }
+        }
+    }
 }
 
 impl OccupancyMap {
@@ -276,6 +300,35 @@ mod tests {
         occ_map.ray_update_gaussian(0.05, 0.05, 0.05, 0.65, 0.05);
         let grid = occ_map.get_grid();
         assert!(grid[1][0] < DEFAULT_UNCERTAINTY, "Cell well before hit should be marked free");
+    }
+
+    #[test]
+    fn mark_free_radius_sets_cells_within_radius_to_zero() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        occ_map.mark_free_radius(0.5, 0.5, 0.2);
+        let grid = occ_map.get_grid();
+        // Cell at center should be free
+        assert_eq!(grid[5][5], 0.0);
+        // Cell just outside radius should remain at default
+        assert_eq!(grid[0][0], DEFAULT_UNCERTAINTY);
+    }
+
+    #[test]
+    fn mark_free_radius_is_circular() {
+        let mut occ_map = OccupancyMap::new(20, 20, 0.1, 0.0, 0.0);
+        occ_map.mark_free_radius(1.0, 1.0, 0.15);
+        let grid = occ_map.get_grid();
+        // Cell diagonally 2 cells away (~0.28m) should not be cleared
+        assert_eq!(grid[8][8], DEFAULT_UNCERTAINTY);
+        // Cell 1 cell away (0.1m) should be cleared
+        assert_eq!(grid[10][11], 0.0);
+    }
+
+    #[test]
+    fn mark_free_radius_ignores_out_of_bounds_center() {
+        let mut occ_map = OccupancyMap::new(10, 10, 0.1, 0.0, 0.0);
+        // Should not panic when center is outside the map
+        occ_map.mark_free_radius(-1.0, -1.0, 0.5);
     }
 
     #[test]

@@ -55,6 +55,7 @@ class AdeeptAgent(AbstractAgent):
         self._robot = RaspClaws()
         self._robot.daemon = True
         self._robot.start()
+        self._robot.command_input("slow")
 
         self._camera = Picamera2()
         camera_config = self._camera.create_preview_configuration(
