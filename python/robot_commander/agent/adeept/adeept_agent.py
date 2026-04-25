@@ -23,6 +23,7 @@ from robot_commander.agent.adeept.adeept_motion_model import (
 
 _ULTRA_HIT_THRESHOLD_CM = 190.0
 _STAND_SETTLE_S = 2.0
+_PAYLOAD_STABILIZE_S = 1.5
 _SCOUT_OFFSETS_RAD = [math.radians(d) for d in (-30, 30)]
 _SCOUT_DWELL_S = 7.0
 _SCOUT_HEADING_THRESHOLD_RAD = math.radians(5)
@@ -202,6 +203,7 @@ class AdeeptAgent(AbstractAgent):
                 gyro_heading=log_gyro_heading,
             )
             if should_capture_payload:
+                time.sleep(_PAYLOAD_STABILIZE_S)
                 frame = self._camera.capture_array()
                 if frame is not None:
                     ok, buf = cv2.imencode(".jpg", frame)
