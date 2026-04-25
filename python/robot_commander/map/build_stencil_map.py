@@ -38,7 +38,7 @@ _OBJECT_CLASSES: dict[str, str] = {
     "chair":        "chair",
 }
 _NUM_FRAMES = 3
-_FRAME_INTERVAL_S = 0.3
+_FRAME_INTERVAL_S = 0.5
 
 _CLASS_COLORS_BGR = {
     "dining table": (0,  80, 220),  # red-ish

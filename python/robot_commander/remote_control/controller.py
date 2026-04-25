@@ -20,7 +20,7 @@ from robot_commander.remote_control.navigation import Navigator
 from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 
 LOCALIZATION_LOST_THRESHOLD = 30
-_ESCAPE_POSITION = (0.1, 0.2)
+_ESCAPE_POSITION = (0.2, 0.3)
 _INITIAL_FREE_RADIUS_M = 0.3
 
 
@@ -32,6 +32,7 @@ class MapState:
     checkpoint: tuple[float, float] | None
     goal_heading: float | None
     occ_grid: np.ndarray = field(repr=False)
+    escape_plan: list[tuple[float, float]] = field(default_factory=list)
 
 
 class RemoteControl:
@@ -58,6 +59,7 @@ class RemoteControl:
         self._agent_pos: WorldPose | None = None
         self._agent_heading: float | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
+        self._escape_plan: list[tuple[float, float]] = []
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
         self._robot_first_detected: bool = False
@@ -160,6 +162,7 @@ class RemoteControl:
                 escape_start, WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz"
             )
             if escape_path is not None:
+                self._escape_plan = escape_path
                 self._client.set_escape_plan(escape_path)
                 with self._pos_lock:
                     self._last_escape_plan_time = time.monotonic()
@@ -180,6 +183,7 @@ class RemoteControl:
             checkpoint=checkpoint,
             goal_heading=goal_heading,
             occ_grid=occ_grid,
+            escape_plan=list(self._escape_plan),
         )
 
     def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool, goal_heading: float | None = None) -> None:
@@ -250,16 +254,16 @@ class RemoteControl:
                         if decoded_payload is not None:
                             with self._payload_lock:
                                 self._payload_frame = decoded_payload
-                with self._pos_lock:
-                    agent_pos = self._agent_pos
-                if rays:
-                    self._obstacle_mapper.apply_rays(rays)
-                if cone and self._cone_depth_processor is not None and agent_pos is not None:
-                    ultrasonic_min, heading = cone
-                    frame = self._agent_frame
-                    try:
-                        self._depth_queue.put_nowait((frame, ultrasonic_min, agent_pos, heading))
-                    except queue.Full:
-                        pass
+                    with self._pos_lock:
+                        agent_pos = self._agent_pos
+                    if rays:
+                        self._obstacle_mapper.apply_rays(rays)
+                    if cone and self._cone_depth_processor is not None and agent_pos is not None:
+                        ultrasonic_min, heading = cone
+                        frame = self._agent_frame
+                        try:
+                            self._depth_queue.put_nowait((frame, ultrasonic_min, agent_pos, heading))
+                        except queue.Full:
+                            pass
         except Exception:
             traceback.print_exc()

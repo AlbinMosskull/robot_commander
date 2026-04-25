@@ -58,7 +58,7 @@ def _build_localizer_and_depth_processor(
 
 
 class DashboardWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, show_escape_plan: bool = False):
         super().__init__()
         self.setWindowTitle("Robot Commander")
         self.resize(1280, 720)
@@ -94,7 +94,7 @@ class DashboardWindow(QMainWindow):
         main_layout.setContentsMargins(4, 4, 4, 4)
         main_layout.setSpacing(4)
 
-        self._map_widget = MapWidget(self._controller, camera_overhead)
+        self._map_widget = MapWidget(self._controller, camera_overhead, show_escape_plan=show_escape_plan)
 
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)

@@ -22,11 +22,11 @@ def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
 
 
 class MapWidget(QWidget):
-    def __init__(self, controller: RemoteControl, camera: Camera, parent=None):
+    def __init__(self, controller: RemoteControl, camera: Camera, show_escape_plan: bool = False, parent=None):
         super().__init__(parent)
         self._controller = controller
         self._camera = camera
-        self._renderer = MapRenderer(controller.map_coords)
+        self._renderer = MapRenderer(controller.map_coords, show_escape_plan=show_escape_plan)
         self.setStyleSheet("background-color: #0d0d0d;")
 
         layout = QVBoxLayout(self)

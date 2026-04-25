@@ -231,11 +231,9 @@ class AdeeptAgent(AbstractAgent):
         with self._lock:
             self._payload_enabled = True
 
-    def GetPendingPayload(self) -> bytes | None:
+    def GetPayload(self) -> bytes | None:
         with self._payload_lock:
-            payload = self._pending_payload
-            self._pending_payload = None
-            return payload
+            return self._pending_payload
 
     def GetXandY(self) -> tuple[float, float]:
         with self._lock:

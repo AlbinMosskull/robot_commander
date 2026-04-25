@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -19,8 +20,12 @@ _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--show-escape-plan", action="store_true")
+    args = parser.parse_args()
+
     app = QApplication(sys.argv)
-    dashboard = DashboardWindow()
+    dashboard = DashboardWindow(show_escape_plan=args.show_escape_plan)
 
     debug_images = (
         sorted(

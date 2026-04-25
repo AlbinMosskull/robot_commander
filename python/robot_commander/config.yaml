@@ -7,7 +7,7 @@ camera:
   # Manual exposure in 100µs steps (UVC absolute time, range 1–10000).
   # null = leave on auto. Start around 50 (5ms / 1/200s) and tune from there.
   # Lower = shorter shutter = less motion blur, but darker image.
-  exposure: 200
+  exposure: 300
 
 checkerboard:
   cols: 9

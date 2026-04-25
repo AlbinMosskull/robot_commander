@@ -61,7 +61,7 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
                 if ok:
                     camera_frame_jpg = buf.tobytes()
 
-            pending_payload = self._agent.GetPendingPayload()
+            pending_payload = self._agent.GetPayload()
             kwargs = {}
             if pending_payload is not None:
                 kwargs["payload_frame_jpg"] = pending_payload

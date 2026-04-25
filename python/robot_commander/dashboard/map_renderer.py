@@ -12,12 +12,20 @@ _OVERLAY_ALPHA = 0.45
 
 
 class MapRenderer:
-    def __init__(self, map_coords: MapCoordinates):
+    def __init__(self, map_coords: MapCoordinates, show_escape_plan: bool = False):
         self._map_coords = map_coords
+        self._show_escape_plan = show_escape_plan
 
     def render(self, state: MapState) -> np.ndarray:
         canvas = self._map_coords.background.copy()
         self._draw_occupancy_overlay(canvas, state.occ_grid)
+
+        if self._show_escape_plan and state.escape_plan:
+            pts = [self._map_coords.world_to_px(wx, wy) for wx, wy in state.escape_plan]
+            for point_a, point_b in zip(pts, pts[1:]):
+                cv2.line(canvas, point_a, point_b, (0, 140, 220), 2)
+            cv2.circle(canvas, pts[-1], 6, (0, 140, 220), -1)
+            cv2.circle(canvas, pts[-1], 6, (0, 0, 0), 1)
 
         if state.planned_path:
             pts = [self._map_coords.world_to_px(wx, wy) for wx, wy in state.planned_path]
