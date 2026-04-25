@@ -110,7 +110,7 @@ class SimulatedAgent(AbstractAgent):
 
             time.sleep(_DT)
 
-    def SetWaypointList(self, waypoints: list[tuple[float, float]]) -> None:
+    def SetWaypointList(self, waypoints: list[tuple[float, float]], final_heading: float | None = None) -> None:
         with self._lock:
             self._waypoints = list(waypoints)
             self._waypoint_idx = 0

@@ -3,7 +3,7 @@ import numpy as np
 
 from robot_commander.image_processing.camera import WebCamera
 from robot_commander.semantic_understanding.detection_segmentor import DetectionSegmentor
-from robot_commander.semantic_understanding.types import SegmentationResult
+from robot_commander.semantic_understanding.semantic_types import SegmentationResult
 
 _PALETTE = [
     (0, 100, 255),

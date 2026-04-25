@@ -1,6 +1,6 @@
 import numpy as np
 
-from robot_commander.semantic_understanding.types import BoundingBox
+from robot_commander.semantic_understanding.semantic_types import BoundingBox
 
 
 def test_overlapping_boxes_detected():

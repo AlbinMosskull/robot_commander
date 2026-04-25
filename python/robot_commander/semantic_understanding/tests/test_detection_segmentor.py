@@ -1,7 +1,7 @@
 import numpy as np
 
 from robot_commander.semantic_understanding.detection_segmentor import _merge_boxes, _to_prompts
-from robot_commander.semantic_understanding.types import BoundingBox, SegmentationResult
+from robot_commander.semantic_understanding.semantic_types import BoundingBox, SegmentationResult
 
 
 def test_merge_boxes_combines_overlapping():

@@ -2,7 +2,7 @@ import numpy as np
 
 from robot_commander.semantic_understanding.object_detection import ObjectDetector
 from robot_commander.semantic_understanding.sam_segmentor import SamSegmentor
-from robot_commander.semantic_understanding.types import BoundingBox, SegmentationResult
+from robot_commander.semantic_understanding.semantic_types import BoundingBox, SegmentationResult
 
 
 def _merge_boxes(

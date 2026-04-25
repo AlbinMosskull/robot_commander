@@ -81,6 +81,7 @@ class AdeeptAgent(AbstractAgent):
         self._last_remote_message_time: float = time.time()
 
         self._escape_plan_enabled = escape_plan_enabled
+        self._final_heading: float | None = None
         self._gyro_heading: float | None = None
         self._last_motion_time: float = 0.0
         self._logger = RunLogger()
@@ -147,9 +148,14 @@ class AdeeptAgent(AbstractAgent):
                     active_waypoints = self._escape_plan
                     active_idx = self._escape_plan_idx
                 else:
+                    had_waypoints = bool(self._waypoints)
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(
                         self._waypoints, self._waypoint_idx
                     )
+                    if had_waypoints and not self._waypoints and self._final_heading is not None:
+                        heading = self._final_heading
+                        self._final_heading = None
+                        threading.Thread(target=self._rotate_to_heading_with_override, args=(heading,), daemon=True).start()
                     active_waypoints = self._waypoints
                     active_idx = self._waypoint_idx
                 current_heading = self._heading_filter.heading
@@ -187,11 +193,12 @@ class AdeeptAgent(AbstractAgent):
             )
             time.sleep(_DT)
 
-    def SetWaypointList(self, waypoints: list[tuple[float, float]]) -> None:
+    def SetWaypointList(self, waypoints: list[tuple[float, float]], final_heading: float | None = None) -> None:
         with self._lock:
             self._waypoints = list(waypoints)
             self._waypoint_idx = 0
             self._heading_aligned = False
+            self._final_heading = final_heading
             self._last_remote_message_time = time.time()
 
     def SetEscapePlan(self, waypoints: list[tuple[float, float]]) -> None:
@@ -335,6 +342,15 @@ class AdeeptAgent(AbstractAgent):
         with self._lock:
             self._current_command = "stand"
         self._robot.command_input("stand")
+
+    def _rotate_to_heading_with_override(self, target_rad: float) -> None:
+        with self._lock:
+            self._manual_override = True
+        try:
+            self._rotate_to_heading(target_rad)
+        finally:
+            with self._lock:
+                self._manual_override = False
 
     def Scout(self) -> None:
         with self._lock:

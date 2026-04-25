@@ -12,7 +12,7 @@ from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 _TRAVEL_TIMEOUT_S = 5.0
 _SCOUT_TIMEOUT_S = 8.0
 _TURN_TIMEOUT_S = 2.0
-_TURN_DIST_M = 0.05
+_SCOUT_TURN_DIST_M = 0.05
 _MAX_SCOUT_ATTEMPTS = 5
 _GOAL_REACHED_THRESHOLD_M = 0.1
 
@@ -101,17 +101,11 @@ class Navigator:
                     return
                 self._planned_path = path
                 self._checkpoint = None
-                self._client.set_path(path)
                 end_x, end_y = path[-1]
                 dist_to_goal = math.sqrt((end_x - goal_x) ** 2 + (end_y - goal_y) ** 2)
-                if dist_to_goal < _GOAL_REACHED_THRESHOLD_M:
-                    if goal_heading is not None:
-                        if stop_event.wait(timeout=_TRAVEL_TIMEOUT_S):
-                            return
-                        self._client.set_checkpoint(
-                            goal_x + _TURN_DIST_M * math.cos(goal_heading),
-                            goal_y + _TURN_DIST_M * math.sin(goal_heading),
-                        )
+                at_goal = dist_to_goal < _GOAL_REACHED_THRESHOLD_M
+                self._client.set_path(path, final_heading=goal_heading if at_goal else None)
+                if at_goal:
                     return
 
                 if stop_event.wait(timeout=_TRAVEL_TIMEOUT_S):
@@ -124,8 +118,8 @@ class Navigator:
                 if agent_pos is not None:
                     bearing = math.atan2(goal_y - agent_pos.y, goal_x - agent_pos.x)
                     self._client.set_checkpoint(
-                        agent_pos.x + _TURN_DIST_M * math.cos(bearing),
-                        agent_pos.y + _TURN_DIST_M * math.sin(bearing),
+                        agent_pos.x + _SCOUT_TURN_DIST_M * math.cos(bearing),
+                        agent_pos.y + _SCOUT_TURN_DIST_M * math.sin(bearing),
                     )
                     if stop_event.wait(timeout=_TURN_TIMEOUT_S):
                         return

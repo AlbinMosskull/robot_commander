@@ -12,9 +12,11 @@ class AgentClient:
     def set_checkpoint(self, x: float, y: float) -> None:
         self._stub.SetCheckpoint(agent_pb2.Position(x=x, y=y))
 
-    def set_path(self, waypoints: list[tuple[float, float]]) -> None:
-        path = agent_pb2.Path(waypoints=[agent_pb2.Position(x=x, y=y) for x, y in waypoints])
-        self._stub.SetPath(path)
+    def set_path(self, waypoints: list[tuple[float, float]], final_heading: float | None = None) -> None:
+        kwargs = {"waypoints": [agent_pb2.Position(x=x, y=y) for x, y in waypoints]}
+        if final_heading is not None:
+            kwargs["final_heading"] = final_heading
+        self._stub.SetPath(agent_pb2.Path(**kwargs))
 
     def set_escape_plan(self, waypoints: list[tuple[float, float]]) -> None:
         path = agent_pb2.Path(waypoints=[agent_pb2.Position(x=x, y=y) for x, y in waypoints])

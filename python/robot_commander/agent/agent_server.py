@@ -22,7 +22,8 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         return agent_pb2.Empty()
 
     def SetPath(self, request, context):
-        self._agent.SetWaypointList([(p.x, p.y) for p in request.waypoints])
+        final_heading = request.final_heading if request.HasField("final_heading") else None
+        self._agent.SetWaypointList([(p.x, p.y) for p in request.waypoints], final_heading=final_heading)
         return agent_pb2.Empty()
 
     def SetEscapePlan(self, request, context):

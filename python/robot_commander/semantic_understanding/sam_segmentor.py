@@ -4,7 +4,7 @@ import torch
 from PIL import Image
 from transformers import SamModel, SamProcessor
 
-from robot_commander.semantic_understanding.types import SegmentationResult
+from robot_commander.semantic_understanding.semantic_types import SegmentationResult
 
 
 class SamSegmentor:

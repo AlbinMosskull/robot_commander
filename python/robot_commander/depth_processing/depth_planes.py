@@ -105,22 +105,22 @@ def _to_landmark_with_reason(
 ) -> tuple[LandmarkPlane | None, str | None]:
     floor_dot = abs(float(plane.normal @ floor_normal))
     if floor_dot > _FLOOR_DOT_THRESHOLD:
-        print(f"  [plane {plane_idx}] REJECTED floor-like: cam_normal={plane.normal} dot={floor_dot:.2f}")
+        # print(f"  [plane {plane_idx}] REJECTED floor-like: cam_normal={plane.normal} dot={floor_dot:.2f}")
         return None, f"floor-like (dot={floor_dot:.2f})"
 
     inlier_count = int(plane.inliers.sum())
     if inlier_count < _MIN_INLIERS:
-        print(f"  [plane {plane_idx}] REJECTED too few inliers: {inlier_count}")
+        # print(f"  [plane {plane_idx}] REJECTED too few inliers: {inlier_count}")
         return None, f"too few inliers ({inlier_count})"
     if inlier_count / len(all_points) < _MIN_INLIER_FRACTION:
-        print(f"  [plane {plane_idx}] REJECTED fraction too small: {inlier_count/len(all_points):.3f}")
+        # print(f"  [plane {plane_idx}] REJECTED fraction too small: {inlier_count/len(all_points):.3f}")
         return None, f"inlier fraction too small ({inlier_count / len(all_points):.3f})"
 
     world_normal = _camera_normal_to_world_2d(plane.normal, right, forward, agent_heading)
     if world_normal is None:
         return None, "normal has no horizontal component"
 
-    print(f"  [plane {plane_idx}] cam_normal={plane.normal}  world_normal={world_normal}")
+    # print(f"  [plane {plane_idx}] cam_normal={plane.normal}  world_normal={world_normal}")
 
     tangent = np.array([-world_normal[1], world_normal[0]])
     tangent_projs = world_2d @ tangent
@@ -132,10 +132,10 @@ def _to_landmark_with_reason(
     cluster_tangent_projs = cluster_points @ tangent
     extent = float(cluster_tangent_projs.max() - cluster_tangent_projs.min())
     if extent < _MIN_EXTENT_M:
-        print(f"  [plane {plane_idx}] REJECTED cluster too small: extent={extent:.3f}m")
+        # print(f"  [plane {plane_idx}] REJECTED cluster too small: extent={extent:.3f}m")
         return None, f"largest cluster extent too small ({extent:.2f} m)"
     if extent > _MAX_EXTENT_M:
-        print(f"  [plane {plane_idx}] REJECTED cluster too large: extent={extent:.3f}m")
+        # print(f"  [plane {plane_idx}] REJECTED cluster too large: extent={extent:.3f}m")
         return None, f"largest cluster extent too large ({extent:.2f} m)"
 
     centroid = cluster_points.mean(axis=0)
@@ -143,12 +143,12 @@ def _to_landmark_with_reason(
     endpoint_a = world_distance * world_normal + float(cluster_tangent_projs.min()) * tangent
     endpoint_b = world_distance * world_normal + float(cluster_tangent_projs.max()) * tangent
 
-    print(f"  [plane {plane_idx}] ACCEPTED: world_dist={world_distance:.3f}m  extent={extent:.3f}m  "
-          f"A={endpoint_a}  B={endpoint_b}  inliers={inlier_count}")
-    print(f"  [plane {plane_idx}]   world_2d range x=[{world_2d[:,0].min():.3f},{world_2d[:,0].max():.3f}] "
-          f"y=[{world_2d[:,1].min():.3f},{world_2d[:,1].max():.3f}]")
-    print(f"  [plane {plane_idx}]   cam_inlier depth range [{plane.distance - _RANSAC_DISTANCE_THRESHOLD_M:.3f}, {plane.distance + _RANSAC_DISTANCE_THRESHOLD_M:.3f}]m  "
-          f"cam_dist={plane.distance:.3f}")
+    # print(f"  [plane {plane_idx}] ACCEPTED: world_dist={world_distance:.3f}m  extent={extent:.3f}m  "
+    #       f"A={endpoint_a}  B={endpoint_b}  inliers={inlier_count}")
+    # print(f"  [plane {plane_idx}]   world_2d range x=[{world_2d[:,0].min():.3f},{world_2d[:,0].max():.3f}] "
+    #       f"y=[{world_2d[:,1].min():.3f},{world_2d[:,1].max():.3f}]")
+    # print(f"  [plane {plane_idx}]   cam_inlier depth range [{plane.distance - _RANSAC_DISTANCE_THRESHOLD_M:.3f}, {plane.distance + _RANSAC_DISTANCE_THRESHOLD_M:.3f}]m  "
+    #       f"cam_dist={plane.distance:.3f}")
 
     return LandmarkPlane(
         normal=world_normal,

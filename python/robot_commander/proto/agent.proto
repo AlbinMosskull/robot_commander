@@ -15,6 +15,7 @@ service AgentControl {
 
 message Path {
   repeated Position waypoints = 1;
+  optional float final_heading = 2;
 }
 
 message Position {
