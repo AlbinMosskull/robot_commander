@@ -9,8 +9,9 @@ import numpy as np
 from robot_commander.config import load as load_config
 from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
-from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
+from robot_commander.depth_processing.cone_depth_rays import depth_to_rays, detect_floor, floor_plane_basis
 from robot_commander.depth_processing.depth_capture import load, rays_to_ends
+from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
 from robot_commander.depth_processing.depth_planes import extract_landmark_planes_debug
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
@@ -49,9 +50,35 @@ def _print_validation(validation: PlaneValidationResult) -> None:
     print()
 
 
+def _print_ray_pipeline_diagnostics(calibrated_depth: np.ndarray, intrinsics) -> None:
+    from robot_commander.depth_processing.cone_depth_rays import _MIN_OBSTACLE_HEIGHT_M
+    print("\n--- Ray pipeline diagnostics ---")
+    camera_points = depth_image_to_point_cloud(calibrated_depth, intrinsics)
+    print(f"  point cloud size: {len(camera_points)}")
+    ones = np.ones((len(camera_points), 1), dtype=np.float32)
+    points = np.hstack([camera_points, ones])[:, :3]
+    floor = detect_floor(points)
+    if floor is None:
+        print("  floor: NOT DETECTED — no rays possible")
+        return
+    print(f"  floor normal: {floor.normal}  distance: {floor.distance:.4f}  inliers: {floor.inliers.sum()}")
+    heights = points @ floor.normal - floor.distance
+    above = (heights > _MIN_OBSTACLE_HEIGHT_M)
+    print(f"  points above floor (>{_MIN_OBSTACLE_HEIGHT_M} m): {above.sum()} / {len(points)}")
+    right, forward = floor_plane_basis(floor.normal)
+    valid = points[above]
+    if len(valid) > 0:
+        rights = valid @ right
+        forwards = valid @ forward
+        horiz = np.sqrt(rights ** 2 + forwards ** 2)
+        print(f"  horizontal distances: min={horiz.min():.3f}  p5={np.percentile(horiz, 5):.3f}  max={horiz.max():.3f} m")
+    print()
+
+
 def _show(
     capture_path: Path,
     save_path: Path | None = None,
+    no_plot: bool = False,
 ) -> None:
     capture = load(capture_path)
 
@@ -70,6 +97,13 @@ def _show(
     rays = depth_to_rays(calibrated_depth, capture.intrinsics, capture.agent_x, capture.agent_y, capture.heading)
     ray_ends = rays_to_ends(rays)
     print(f"ray_ends (regenerated): {ray_ends.shape}")
+    if len(rays) > 0:
+        lengths = [math.hypot(r.end_x - r.start_x, r.end_y - r.start_y) for r in rays]
+        print(f"ray lengths: min={min(lengths):.3f}  median={sorted(lengths)[len(lengths)//2]:.3f}  max={max(lengths):.3f} m")
+    _print_ray_pipeline_diagnostics(calibrated_depth, capture.intrinsics)
+
+    if no_plot:
+        return
 
     is_valid = validation.disqualification_reason is None
     display_depth = calibrated_depth if capture.is_calibrated else raw_depth
@@ -287,5 +321,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualize a saved depth capture")
     parser.add_argument("--path", type=Path, default=_DEFAULT_PATH)
     parser.add_argument("--save", type=Path, default=None, metavar="OUTPUT_PNG")
+    parser.add_argument("--no-plot", action="store_true")
     args = parser.parse_args()
-    _show(args.path, save_path=args.save)
+    _show(args.path, save_path=args.save, no_plot=args.no_plot)

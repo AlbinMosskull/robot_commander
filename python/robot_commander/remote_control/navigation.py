@@ -9,11 +9,6 @@ from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 
-_TRAVEL_TIMEOUT_S = 5.0
-_SCOUT_TIMEOUT_S = 8.0
-_TURN_TIMEOUT_S = 2.0
-_SCOUT_TURN_DIST_M = 0.05
-_MAX_SCOUT_ATTEMPTS = 5
 _GOAL_REACHED_THRESHOLD_M = 0.1
 
 
@@ -85,43 +80,24 @@ class Navigator:
         goal_heading: float | None,
         stop_event: threading.Event,
     ) -> None:
-        for _ in range(_MAX_SCOUT_ATTEMPTS):
-            if stop_event.is_set():
+        if stop_event.is_set():
+            return
+        try:
+            agent_pos = self._get_agent_pos()
+            if agent_pos is None:
                 return
-            try:
-                agent_pos = self._get_agent_pos()
-                if agent_pos is None:
-                    return
-                path = self._obstacle_mapper.plan_path(
-                    WorldPosition2d(agent_pos.x, agent_pos.y),
-                    WorldPosition2d(goal_x, goal_y),
-                    "user_path.npz",
-                )
-                if path is None:
-                    return
-                self._planned_path = path
-                self._checkpoint = None
-                end_x, end_y = path[-1]
-                dist_to_goal = math.sqrt((end_x - goal_x) ** 2 + (end_y - goal_y) ** 2)
-                at_goal = dist_to_goal < _GOAL_REACHED_THRESHOLD_M
-                self._client.set_path(path, final_heading=goal_heading if at_goal else None)
-                if at_goal:
-                    return
-
-                if stop_event.wait(timeout=_TRAVEL_TIMEOUT_S):
-                    return
-                self._client.scout()
-                if stop_event.wait(timeout=_SCOUT_TIMEOUT_S):
-                    return
-
-                agent_pos = self._get_agent_pos()
-                if agent_pos is not None:
-                    bearing = math.atan2(goal_y - agent_pos.y, goal_x - agent_pos.x)
-                    self._client.set_checkpoint(
-                        agent_pos.x + _SCOUT_TURN_DIST_M * math.cos(bearing),
-                        agent_pos.y + _SCOUT_TURN_DIST_M * math.sin(bearing),
-                    )
-                    if stop_event.wait(timeout=_TURN_TIMEOUT_S):
-                        return
-            except Exception:
-                traceback.print_exc()
+            path = self._obstacle_mapper.plan_path(
+                WorldPosition2d(agent_pos.x, agent_pos.y),
+                WorldPosition2d(goal_x, goal_y),
+                "user_path.npz",
+            )
+            if path is None:
+                return
+            self._planned_path = path
+            self._checkpoint = None
+            end_x, end_y = path[-1]
+            dist_to_goal = math.sqrt((end_x - goal_x) ** 2 + (end_y - goal_y) ** 2)
+            at_goal = dist_to_goal < _GOAL_REACHED_THRESHOLD_M
+            self._client.set_path(path, final_heading=goal_heading if at_goal else None)
+        except Exception:
+            traceback.print_exc()

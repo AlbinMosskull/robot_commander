@@ -1,17 +1,10 @@
-import math
-
 import cv2
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
-from robot_commander.depth_processing.depth_capture import DepthCapture
 from robot_commander.remote_control.controller import RemoteControl
-
-_TOP_DOWN_SIZE = 300
-_TOP_DOWN_RANGE_M = 2.0
-_HEADING_ARROW_PX = 30
 
 
 def _signal_lost_frame(w: int, h: int) -> np.ndarray:
@@ -40,52 +33,6 @@ def _render_depth_map(depth: np.ndarray) -> np.ndarray:
     gray = (normalized * 255).astype(np.uint8)
     return cv2.applyColorMap(gray, cv2.COLORMAP_PLASMA)
 
-
-def _render_top_down_rays(capture: DepthCapture) -> np.ndarray:
-    canvas = np.zeros((_TOP_DOWN_SIZE, _TOP_DOWN_SIZE, 3), dtype=np.uint8)
-    canvas[:] = (20, 20, 20)
-
-    scale = _TOP_DOWN_SIZE / (2.0 * _TOP_DOWN_RANGE_M)
-    cx = _TOP_DOWN_SIZE // 2
-    cy = _TOP_DOWN_SIZE // 2
-
-    def world_to_px(wx: float, wy: float) -> tuple[int, int]:
-        px = int(cx + (wx - capture.agent_x) * scale)
-        py = int(cy - (wy - capture.agent_y) * scale)
-        return px, py
-
-    agent_px = world_to_px(capture.agent_x, capture.agent_y)
-
-    for end_x, end_y in capture.ray_ends:
-        end_px = world_to_px(end_x, end_y)
-        cv2.line(canvas, agent_px, end_px, (60, 120, 200), 1, cv2.LINE_AA)
-
-    if len(capture.ray_ends) > 0:
-        for end_x, end_y in capture.ray_ends:
-            end_px = world_to_px(end_x, end_y)
-            cv2.circle(canvas, end_px, 3, (50, 50, 220), -1, cv2.LINE_AA)
-
-    arrow_dx = int(_HEADING_ARROW_PX * math.cos(capture.heading))
-    arrow_dy = int(-_HEADING_ARROW_PX * math.sin(capture.heading))
-    cv2.arrowedLine(canvas, agent_px, (agent_px[0] + arrow_dx, agent_px[1] + arrow_dy),
-                    (200, 180, 50), 2, cv2.LINE_AA, tipLength=0.3)
-    cv2.circle(canvas, agent_px, 5, (200, 180, 50), -1, cv2.LINE_AA)
-
-    return canvas
-
-
-def _composite(capture: DepthCapture, target_width: int, target_height: int) -> np.ndarray:
-    frame_view = capture.frame
-    depth_view = _render_depth_map(capture.depth)
-    rays_view = _render_top_down_rays(capture)
-
-    panel_w = target_width // 3
-    panel_h = target_height
-
-    def resize(img: np.ndarray) -> np.ndarray:
-        return cv2.resize(img, (panel_w, panel_h))
-
-    return np.concatenate([resize(frame_view), resize(depth_view), resize(rays_view)], axis=1)
 
 
 class DepthWidget(QWidget):
@@ -133,9 +80,9 @@ class DepthWidget(QWidget):
         capture = self._controller.latest_depth_capture
         if capture is None:
             return
-        composite = _composite(capture, w, h)
+        depth_frame = cv2.resize(_render_depth_map(capture.depth), (w, h))
         self._display.setPixmap(
-            _numpy_bgr_to_pixmap(composite).scaled(
+            _numpy_bgr_to_pixmap(depth_frame).scaled(
                 self._display.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,

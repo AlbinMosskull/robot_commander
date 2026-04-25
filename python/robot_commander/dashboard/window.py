@@ -96,23 +96,31 @@ class DashboardWindow(QMainWindow):
 
         self._map_widget = MapWidget(self._controller, camera_overhead)
 
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(4)
+
+        self._cam_overhead_widget = CameraWidget(camera_overhead, "OVERHEAD ANGLE (CAM-02)")
+        left_layout.addWidget(self._map_widget, stretch=1)
+        left_layout.addWidget(self._cam_overhead_widget, stretch=1)
+
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(4)
 
         self._cam_pov_widget = CameraWidget(camera_pov, "POV CAMERA (CAM-01)")
-        self._cam_overhead_widget = CameraWidget(camera_overhead, "OVERHEAD ANGLE (CAM-02)")
         self._depth_widget = DepthWidget(self._controller)
         self._payload_widget = PayloadWidget(self._controller)
 
+        self._payload_widget.setMaximumHeight(120)
         right_layout.addWidget(self._cam_pov_widget, stretch=1)
-        right_layout.addWidget(self._cam_overhead_widget, stretch=1)
         right_layout.addWidget(self._depth_widget, stretch=1)
-        right_layout.addWidget(self._payload_widget, stretch=1)
+        right_layout.addWidget(self._payload_widget)
 
-        main_layout.addWidget(self._map_widget, stretch=3)
-        main_layout.addWidget(right_panel, stretch=2)
+        main_layout.addWidget(left_panel, stretch=1)
+        main_layout.addWidget(right_panel, stretch=1)
 
         root_layout.addWidget(main_area, stretch=1)
 

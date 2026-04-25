@@ -70,8 +70,8 @@ def extract_landmark_planes_debug(
     floor_plane = max(all_planes, key=lambda p: abs(float(p.normal @ _CAMERA_UP)))
     floor_alignment = abs(float(floor_plane.normal @ _CAMERA_UP))
 
-    print(f"  [planes] agent=({agent_x:.3f},{agent_y:.3f}) heading={math.degrees(agent_heading):.1f}°")
-    print(f"  [planes] floor_normal={floor_plane.normal} alignment={floor_alignment:.3f}")
+    # print(f"  [planes] agent=({agent_x:.3f},{agent_y:.3f}) heading={math.degrees(agent_heading):.1f}°")
+    # print(f"  [planes] floor_normal={floor_plane.normal} alignment={floor_alignment:.3f}")
 
     if floor_alignment < _MIN_FLOOR_ALIGNMENT:
         return LandmarkPlaneDebugResult(planes=[], floor_alignment=floor_alignment)
@@ -79,7 +79,7 @@ def extract_landmark_planes_debug(
     if float(floor_plane.normal @ _CAMERA_UP) < 0:
         floor_plane = Plane(-floor_plane.normal, -floor_plane.distance, floor_plane.inliers)
     right, forward = floor_plane_basis(floor_plane.normal)
-    print(f"  [planes] right={right}  forward={forward}")
+    # print(f"  [planes] right={right}  forward={forward}")
 
     debug_infos: list[PlaneDebugInfo] = []
     for idx, plane in enumerate(all_planes):
