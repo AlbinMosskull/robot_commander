@@ -2,10 +2,10 @@
 
 import math
 
-V_FORWARD_M_S = 0.057
+V_FORWARD_M_S = 0.045
 OMEGA_MAX_RAD_S = 0.347
 HEADING_ALIGNMENT_RAD = math.pi / 6
-WAYPOINT_THRESHOLD_M = 0.05
+WAYPOINT_THRESHOLD_M = 0.01
 
 
 def normalize_angle(a: float) -> float:
