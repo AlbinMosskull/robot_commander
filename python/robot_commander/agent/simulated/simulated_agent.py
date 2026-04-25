@@ -152,5 +152,5 @@ class SimulatedAgent(AbstractAgent):
     def EnablePayload(self) -> None:
         pass
 
-    def GetPendingPayload(self) -> bytes | None:
+    def GetPayload(self) -> bytes | None:
         return None
