@@ -284,7 +284,10 @@ class RemoteControl:
                 break
             frame, ultrasonic_min, agent_pos, heading = job
             try:
-                calibrated_depth, cone_mask = self._cone_depth_processor.process_with_mask(frame, ultrasonic_min)
+                calibrated_depth, cone_mask, _, validation = self._cone_depth_processor.process_with_validation(frame, ultrasonic_min)
+                if validation.disqualification_reason is not None:
+                    print(f"Depth update skipped: {validation.disqualification_reason}")
+                    continue
                 depth_rays = depth_to_rays(
                     calibrated_depth, self._cone_intrinsics,
                     agent_pos.x, agent_pos.y, heading,

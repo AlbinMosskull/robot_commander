@@ -11,9 +11,11 @@ from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTE
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
 from robot_commander.depth_processing.depth_capture import load, rays_to_ends
+from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
 
 _DEFAULT_PATH = Path(__file__).parent / "latest_depth_capture.npz"
 _HEADING_ARROW_LENGTH_M = 0.3
+_PLANE_COLORS = ["red", "lime", "cyan"]
 _cfg = load_config()
 
 
@@ -26,6 +28,24 @@ def _build_depth_processor(capture) -> ConeDepthProcessor:
     )
 
 
+def _print_validation(validation: PlaneValidationResult) -> None:
+    print("\n--- Ultrasonic plane validation ---")
+    if not validation.all_candidates:
+        print("  No planes detected")
+    for i, candidate in enumerate(validation.all_candidates):
+        selected = candidate is validation.best_candidate
+        tag = " [SELECTED]" if selected else ""
+        print(
+            f"  Plane {i}: fill={candidate.cone_fill_fraction:.3f}"
+            f"  normal_angle={candidate.normal_angle_deg:.1f}°{tag}"
+        )
+    if validation.disqualification_reason is None:
+        print("  Result: VALID")
+    else:
+        print(f"  Result: DISQUALIFIED — {validation.disqualification_reason}")
+    print()
+
+
 def _show(
     capture_path: Path,
     save_path: Path | None = None,
@@ -33,24 +53,28 @@ def _show(
     capture = load(capture_path)
 
     depth_processor = _build_depth_processor(capture)
-    calibrated_depth, cone_mask = depth_processor.process_with_mask(capture.frame, capture.ultrasonic_min)
+    calibrated_depth, cone_mask, validation_mask, validation = depth_processor.process_with_validation(
+        capture.frame, capture.ultrasonic_min
+    )
 
     print(f"Ultrasonic min reading: {capture.ultrasonic_min:.4f} m")
     print(f"agent: ({capture.agent_x:.4f}, {capture.agent_y:.4f})  heading: {capture.heading:.4f} rad")
     print(f"calibrated_depth range: [{calibrated_depth.min():.4f}, {calibrated_depth.max():.4f}] m")
     print(f"calibrated_depth (cone only) range: [{calibrated_depth[cone_mask].min():.4f}, {calibrated_depth[cone_mask].max():.4f}] m")
+    _print_validation(validation)
 
     masked_depth = np.where(cone_mask, calibrated_depth, 0.0).astype(np.float32)
     rays = depth_to_rays(masked_depth, capture.intrinsics, capture.agent_x, capture.agent_y, capture.heading)
     ray_ends = rays_to_ends(rays)
     print(f"ray_ends (regenerated): {ray_ends.shape}")
 
-    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(22, 5))
     fig.suptitle(f"Depth capture — {capture_path.name}")
 
     _draw_frame_with_cone_mask(axes[0], capture.frame, cone_mask)
     _draw_depth_map(axes[1], calibrated_depth)
     _draw_top_down_rays(axes[2], capture.agent_x, capture.agent_y, capture.heading, ray_ends)
+    _draw_plane_inliers(axes[3], calibrated_depth, validation_mask, validation)
 
     plt.tight_layout()
 
@@ -115,6 +139,57 @@ def _draw_top_down_rays(ax, agent_x: float, agent_y: float, heading: float, ray_
 
     ax.legend()
     ax.grid(True, alpha=0.3)
+
+
+def _draw_plane_inliers(ax, depth: np.ndarray, cone_mask: np.ndarray, validation: PlaneValidationResult) -> None:
+    rgb_overlay = np.zeros((*depth.shape, 3), dtype=np.uint8)
+    cone_pixel_indices = np.argwhere(cone_mask)
+
+    for i, candidate in enumerate(validation.all_candidates):
+        color_name = _PLANE_COLORS[i % len(_PLANE_COLORS)]
+        color = _color_to_rgb(color_name)
+        inlier_pixels = cone_pixel_indices[candidate.plane.inliers]
+        rows, cols = inlier_pixels[:, 0], inlier_pixels[:, 1]
+        rgb_overlay[rows, cols] = color
+
+    ax.imshow(rgb_overlay)
+
+    selected = validation.best_candidate
+    if selected is not None:
+        idx = validation.all_candidates.index(selected)
+        color = _PLANE_COLORS[idx % len(_PLANE_COLORS)]
+        status = "valid" if validation.disqualification_reason is None else f"disqualified: {validation.disqualification_reason}"
+        title = f"Planes — selected: plane {idx} ({color})\n{status}"
+    else:
+        title = f"Planes — none selected\n{validation.disqualification_reason or ''}"
+
+    ax.set_title(title, fontsize=8)
+    ax.axis("off")
+
+    handles = []
+    for i, candidate in enumerate(validation.all_candidates):
+        color = _PLANE_COLORS[i % len(_PLANE_COLORS)]
+        patch = plt.Rectangle((0, 0), 1, 1, color=color)
+        label = f"P{i}: fill={candidate.cone_fill_fraction:.2f} ang={candidate.normal_angle_deg:.0f}°"
+        handles.append((patch, label))
+
+    if handles:
+        ax.legend(
+            [h for h, _ in handles],
+            [l for _, l in handles],
+            loc="lower left",
+            fontsize=7,
+            framealpha=0.7,
+        )
+
+
+def _color_to_rgb(name: str) -> tuple[int, int, int]:
+    mapping = {
+        "red": (220, 50, 50),
+        "lime": (50, 220, 50),
+        "cyan": (50, 220, 220),
+    }
+    return mapping[name]
 
 
 if __name__ == "__main__":
