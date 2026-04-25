@@ -14,6 +14,16 @@ _TOP_DOWN_RANGE_M = 2.0
 _HEADING_ARROW_PX = 30
 
 
+def _signal_lost_frame(w: int, h: int) -> np.ndarray:
+    canvas = np.full((h, w, 3), 13, dtype=np.uint8)
+    text = "SIGNAL LOST"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale, thickness = 0.8, 2
+    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
+    cv2.putText(canvas, text, ((w - tw) // 2, (h + th) // 2), font, scale, (60, 60, 180), thickness)
+    return canvas
+
+
 def _numpy_bgr_to_pixmap(frame: np.ndarray) -> QPixmap:
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     h, w, ch = rgb.shape
@@ -73,7 +83,7 @@ def _render_top_down_rays(capture: DepthCapture) -> np.ndarray:
 
 def _composite(capture: DepthCapture, target_width: int, target_height: int) -> np.ndarray:
     frame_view = _render_frame_with_cone_mask(capture.frame, capture.cone_mask)
-    depth_view = _render_depth_map(capture.calibrated_depth, capture.cone_mask)
+    depth_view = _render_depth_map(capture.depth, capture.cone_mask)
     rays_view = _render_top_down_rays(capture)
 
     panel_w = target_width // 3
@@ -114,12 +124,21 @@ class DepthWidget(QWidget):
         self._timer.start(200)
 
     def _refresh(self) -> None:
-        capture = self._controller.latest_depth_capture
-        if capture is None:
-            return
         w = self._display.width()
         h = self._display.height()
         if w <= 0 or h <= 0:
+            return
+        if self._controller.connection_lost:
+            self._display.setPixmap(
+                _numpy_bgr_to_pixmap(_signal_lost_frame(w, h)).scaled(
+                    self._display.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+            return
+        capture = self._controller.latest_depth_capture
+        if capture is None:
             return
         composite = _composite(capture, w, h)
         self._display.setPixmap(

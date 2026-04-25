@@ -25,10 +25,14 @@ class MapRenderer:
                 cv2.line(canvas, point_a, point_b, (0, 200, 0), 2)
             cv2.circle(canvas, pts[-1], 8, (0, 200, 0), -1)
             cv2.circle(canvas, pts[-1], 8, (0, 0, 0), 1)
+            if state.goal_heading is not None:
+                self._draw_goal_heading(canvas, state.planned_path[-1], state.goal_heading)
         elif state.checkpoint is not None:
             checkpoint_px = self._map_coords.world_to_px(*state.checkpoint)
             cv2.circle(canvas, checkpoint_px, 8, (0, 200, 0), -1)
             cv2.circle(canvas, checkpoint_px, 8, (0, 0, 0), 1)
+            if state.goal_heading is not None:
+                self._draw_goal_heading(canvas, state.checkpoint, state.goal_heading)
 
         if state.agent_pos is not None:
             agent_px = self._map_coords.world_to_px(state.agent_pos.x, state.agent_pos.y)
@@ -48,6 +52,15 @@ class MapRenderer:
                 cv2.arrowedLine(canvas, agent_px, tip_agent_px, (0, 180, 220), 2, tipLength=0.4)
 
         return canvas
+
+    def _draw_goal_heading(self, canvas: np.ndarray, goal_world: tuple[float, float], heading: float) -> None:
+        arrow_len_m = 0.15
+        origin_px = self._map_coords.world_to_px(*goal_world)
+        tip_px = self._map_coords.world_to_px(
+            goal_world[0] + arrow_len_m * math.cos(heading),
+            goal_world[1] + arrow_len_m * math.sin(heading),
+        )
+        cv2.arrowedLine(canvas, origin_px, tip_px, (0, 200, 0), 2, tipLength=0.4)
 
     def _draw_occupancy_overlay(self, canvas: np.ndarray, occ_grid: np.ndarray) -> None:
         grid = np.flipud(occ_grid)

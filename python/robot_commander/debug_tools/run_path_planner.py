@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_commander import OccupancyMap, WorldPosition2d, plan_path
-from robot_commander.remote_control.controller import PlanPathFailure
+from robot_commander.remote_control.obstacle_mapping import PlanPathFailure
 
 
 def run_path_planner(failure: PlanPathFailure) -> list[tuple[float, float]] | None:

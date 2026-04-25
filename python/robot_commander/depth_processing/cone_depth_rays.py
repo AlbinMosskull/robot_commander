@@ -24,7 +24,7 @@ def detect_floor(points: np.ndarray) -> Plane | None:
     return floor
 
 
-def _floor_plane_basis(floor_normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def floor_plane_basis(floor_normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     right = np.array([1.0, 0.0, 0.0])
     right = right - (right @ floor_normal) * floor_normal
     if np.linalg.norm(right) < 1e-6:
@@ -82,7 +82,7 @@ def depth_to_rays(
     if len(valid) == 0:
         return []
 
-    right, forward = _floor_plane_basis(floor.normal)
+    right, forward = floor_plane_basis(floor.normal)
     rights = valid @ right
     forwards = valid @ forward
     azimuths = np.arctan2(rights, forwards)

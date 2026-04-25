@@ -1,36 +1,26 @@
-import math
 import queue
 import threading
 import time
 import traceback
 from dataclasses import dataclass, field
-from pathlib import Path
-from datetime import datetime
 
 import cv2
 import numpy as np
 
-from robot_commander import OccupancyMap, WorldPosition2d, plan_path_towards_goal_theta_star
+from robot_commander import WorldPosition2d
 from robot_commander.config import load as load_config
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
-from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
-from robot_commander.depth_processing.depth_capture import DepthCapture, rays_to_ends
-from robot_commander.sensor.range_reading import RangeReading
-import robot_commander.depth_processing.depth_capture as depth_capture_io
+from robot_commander.depth_processing.depth_capture import DepthCapture
+from robot_commander.depth_processing.depth_frame import DepthFrameInput
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
+from robot_commander.remote_control.navigation import Navigator
+from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 
-_PATH_COLLISION_MARGIN = 0.1
-_OCC_RESOLUTION = 0.05
 LOCALIZATION_LOST_THRESHOLD = 30
 _ESCAPE_POSITION = (0.1, 0.2)
-_FAILURES_DIR = Path(__file__).parent.parent / "debug_tools" / "failures"
-_DEPTH_CAPTURE_PATH = Path(__file__).parent.parent / "debug_tools" / "latest_depth_capture.npz"
-_LOGS_DIR = Path(__file__).parent.parent / "debug_tools" / "logs"
-_DEPTH_RAY_RANGE_FACTOR = 1.5
-_GAUSSIAN_SIGMA_M = 0.01
 _INITIAL_FREE_RADIUS_M = 0.3
 
 
@@ -40,33 +30,8 @@ class MapState:
     agent_heading: float | None
     planned_path: list[tuple[float, float]]
     checkpoint: tuple[float, float] | None
+    goal_heading: float | None
     occ_grid: np.ndarray = field(repr=False)
-
-
-@dataclass
-class PlanPathFailure:
-    start: WorldPosition2d
-    goal: WorldPosition2d
-    collision_margin: float
-    resolution: float
-    origin_x: float
-    origin_y: float
-    occ_grid: np.ndarray = field(repr=False)
-
-
-def _clip_ray(ray: RangeReading, max_length_m: float) -> tuple[float, float, float, float, bool]:
-    dx = ray.end_x - ray.start_x
-    dy = ray.end_y - ray.start_y
-    length = (dx ** 2 + dy ** 2) ** 0.5
-    if length <= max_length_m:
-        return ray.start_x, ray.start_y, ray.end_x, ray.end_y, ray.did_hit
-    scale = max_length_m / length
-    return ray.start_x, ray.start_y, ray.start_x + dx * scale, ray.start_y + dy * scale, False
-
-
-def _halve_ray(ray: RangeReading, max_length_m: float) -> tuple[float, float, float, float]:
-    start_x, start_y, end_x, end_y, _ = _clip_ray(ray, max_length_m)
-    return start_x, start_y, start_x + (end_x - start_x) * 0.5, start_y + (end_y - start_y) * 0.5
 
 
 class RemoteControl:
@@ -80,29 +45,16 @@ class RemoteControl:
         self._client = client
         self._localizer = localizer
         self._cone_depth_processor = cone_depth_processor
-        self._cone_intrinsics = cone_intrinsics
 
         self._map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
-        occ_origin_x = -self._map_coords.origin_px[0] / self._map_coords.scale_px_per_m
-        occ_origin_y = (self._map_coords.origin_px[1] - self._map_coords.height_px) / self._map_coords.scale_px_per_m
-        occ_width = round(self._map_coords.width_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
-        occ_height = round(self._map_coords.height_px / (self._map_coords.scale_px_per_m * _OCC_RESOLUTION))
-
-        self._occ_resolution = _OCC_RESOLUTION
-        self._occ_origin_x = occ_origin_x
-        self._occ_origin_y = occ_origin_y
-        self._occ_map = OccupancyMap(
-            width=occ_width,
-            height=occ_height,
-            resolution=self._occ_resolution,
-            origin_x=self._occ_origin_x,
-            origin_y=self._occ_origin_y,
+        self._obstacle_mapper = ObstacleMapper(
+            self._map_coords, cone_depth_processor, cone_intrinsics
         )
-        self._occ_lock = threading.Lock()
+        self._navigator = Navigator(
+            client, self._obstacle_mapper, self._map_coords, self._get_agent_pos
+        ) if client is not None else None
 
-        self._checkpoint: tuple[float, float] | None = None
-        self._planned_path: list[tuple[float, float]] = []
         self._agent_pos: WorldPose | None = None
         self._agent_heading: float | None = None
         self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
@@ -110,6 +62,7 @@ class RemoteControl:
         self._localization_jammed: bool = False
         self._robot_first_detected: bool = False
         self._pos_lock = threading.Lock()
+
         self._agent_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -118,15 +71,14 @@ class RemoteControl:
         self._agent_heading_thread: threading.Thread | None = None
         self._depth_worker_thread: threading.Thread | None = None
         self._depth_queue: queue.Queue = queue.Queue(maxsize=1)
-        self._depth_captures_dir: Path = _LOGS_DIR / datetime.now().strftime("%Y%m%dT%H%M%S") / "depth_captures"
-        self._depth_captures_dir.mkdir(parents=True, exist_ok=True)
-        self._latest_depth_capture: DepthCapture | None = None
-        self._depth_capture_lock = threading.Lock()
+
+    def _get_agent_pos(self) -> WorldPose | None:
+        with self._pos_lock:
+            return self._agent_pos
 
     @property
     def latest_depth_capture(self) -> DepthCapture | None:
-        with self._depth_capture_lock:
-            return self._latest_depth_capture
+        return self._obstacle_mapper.latest_depth_capture
 
     @property
     def map_coords(self) -> MapCoordinates:
@@ -191,12 +143,15 @@ class RemoteControl:
                     self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
                 )
         if pose is not None and not self._robot_first_detected:
-            with self._occ_lock:
-                self._occ_map.mark_free_radius(pose.x, pose.y, _INITIAL_FREE_RADIUS_M)
+            self._obstacle_mapper.mark_free_radius(pose.x, pose.y, _INITIAL_FREE_RADIUS_M)
             self._robot_first_detected = True
         if pose is not None and self._client is not None:
             self._client.observe_position(pose.x, pose.y, pose.heading, confidence=1.0)
-            escape_path = self._plan_path(WorldPosition2d(pose.x, pose.y), WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz")
+            target = self._navigator.current_target() if self._navigator is not None else None
+            escape_start = WorldPosition2d(*target) if target is not None else WorldPosition2d(pose.x, pose.y)
+            escape_path = self._obstacle_mapper.plan_path(
+                escape_start, WorldPosition2d(*_ESCAPE_POSITION), "escape_plan.npz"
+            )
             if escape_path is not None:
                 self._client.set_escape_plan(escape_path)
                 with self._pos_lock:
@@ -206,76 +161,29 @@ class RemoteControl:
         with self._pos_lock:
             agent_pos = self._agent_pos
             agent_heading = self._agent_heading
-        with self._occ_lock:
-            occ_grid = np.array(self._occ_map.get_grid(), dtype=np.float32)
+        occ_grid = self._obstacle_mapper.get_grid()
+        if self._navigator is not None:
+            planned_path, checkpoint, goal_heading = self._navigator.snapshot()
+        else:
+            planned_path, checkpoint, goal_heading = [], None, None
         return MapState(
             agent_pos=agent_pos,
             agent_heading=agent_heading,
-            planned_path=list(self._planned_path),
-            checkpoint=self._checkpoint,
+            planned_path=planned_path,
+            checkpoint=checkpoint,
+            goal_heading=goal_heading,
             occ_grid=occ_grid,
         )
 
+    def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool, goal_heading: float | None = None) -> None:
+        if self.connection_lost or self._navigator is None:
+            return
+        self._navigator.handle_click(pixel_x, pixel_y, shift_held, goal_heading)
+
     def set_offset_waypoint(self, angle_offset_rad: float, distance_m: float) -> None:
-        with self._pos_lock:
-            agent_pos = self._agent_pos
-        if agent_pos is None or self._client is None:
+        if self._navigator is None:
             return
-        target_x = agent_pos.x + distance_m * math.cos(agent_pos.heading + angle_offset_rad)
-        target_y = agent_pos.y + distance_m * math.sin(agent_pos.heading + angle_offset_rad)
-        self._checkpoint = (target_x, target_y)
-        self._planned_path = []
-        self._client.set_checkpoint(target_x, target_y)
-
-    def handle_click(self, pixel_x: int, pixel_y: int, shift_held: bool) -> None:
-        if self.connection_lost:
-            return
-        wx, wy = self._map_coords.px_to_world(pixel_x, pixel_y)
-        if shift_held:
-            with self._pos_lock:
-                start = self._agent_pos
-            if start is None or self._client is None:
-                return
-            result = self._plan_path(WorldPosition2d(start.x, start.y), WorldPosition2d(wx, wy), "user_path.npz")
-            if result is None:
-                return
-            self._planned_path = result
-            self._checkpoint = None
-            self._client.set_path(self._planned_path)
-        else:
-            self._checkpoint = (wx, wy)
-            self._planned_path = []
-            if self._client is not None:
-                self._client.set_checkpoint(wx, wy)
-
-    def _plan_path(self, start: WorldPosition2d, goal: WorldPosition2d, failure_filename: str) -> list[tuple[float, float]] | None:
-        with self._occ_lock:
-            result = plan_path_towards_goal_theta_star(self._occ_map, start, goal, _PATH_COLLISION_MARGIN)
-            if result is None:
-                failure = PlanPathFailure(
-                    start=start,
-                    goal=goal,
-                    collision_margin=_PATH_COLLISION_MARGIN,
-                    resolution=self._occ_resolution,
-                    origin_x=self._occ_origin_x,
-                    origin_y=self._occ_origin_y,
-                    occ_grid=np.array(self._occ_map.get_grid(), dtype=np.float32),
-                )
-        if result is None:
-            _FAILURES_DIR.mkdir(exist_ok=True)
-            save_path = _FAILURES_DIR / failure_filename
-            np.savez(
-                save_path,
-                occ_grid=failure.occ_grid,
-                start=np.array([failure.start.x, failure.start.y]),
-                goal=np.array([failure.goal.x, failure.goal.y]),
-                collision_margin=np.array([failure.collision_margin]),
-                resolution=np.array([failure.resolution]),
-                origin=np.array([failure.origin_x, failure.origin_y]),
-            )
-            print(f"Path planning failed: {failure.start=} {failure.goal=} saved to {save_path}")
-            return None
-        return [(point.x, point.y) for point in result]
+        self._navigator.set_offset_waypoint(angle_offset_rad, distance_m)
 
     @property
     def latest_agent_frame(self) -> np.ndarray | None:
@@ -289,68 +197,20 @@ class RemoteControl:
                 break
             frame, ultrasonic_min, agent_pos, heading = job
             try:
-                raw_depth, calibrated_depth, cone_mask, _, validation = self._cone_depth_processor.process_with_validation(frame, ultrasonic_min)
-                if validation.disqualification_reason is not None:
-                    print(f"Depth update (conservative): {validation.disqualification_reason}")
-                    conservative_rays = depth_to_rays(
-                        raw_depth, self._cone_intrinsics,
-                        agent_pos.x, agent_pos.y, heading,
-                    )
-                    max_ray_m = _DEPTH_RAY_RANGE_FACTOR * ultrasonic_min
-                    with self._occ_lock:
-                        for ray in conservative_rays:
-                            try:
-                                sx, sy, ex, ey = _halve_ray(ray, max_ray_m)
-                                self._occ_map.ray_update(sx, sy, ex, ey, False)
-                            except Exception:
-                                traceback.print_exc()
-                    continue
-                depth_rays = depth_to_rays(
-                    calibrated_depth, self._cone_intrinsics,
-                    agent_pos.x, agent_pos.y, heading,
-                )
-                capture = DepthCapture(
+                depth_input = DepthFrameInput(
                     frame=frame,
-                    calibrated_depth=calibrated_depth,
-                    cone_mask=cone_mask,
-                    ray_ends=rays_to_ends(depth_rays),
+                    ultrasonic_min=ultrasonic_min,
                     agent_x=agent_pos.x,
                     agent_y=agent_pos.y,
-                    heading=heading,
-                    ultrasonic_min=ultrasonic_min,
-                    intrinsics=self._cone_intrinsics,
+                    agent_heading=heading,
                 )
-                depth_capture_io.save(capture, _DEPTH_CAPTURE_PATH)
-                depth_capture_io.save(capture, self._depth_captures_dir / f"{time.monotonic():.3f}.npz")
-                with self._depth_capture_lock:
-                    self._latest_depth_capture = capture
-                max_ray_m = _DEPTH_RAY_RANGE_FACTOR * ultrasonic_min
-                with self._occ_lock:
-                    for ray in depth_rays:
-                        try:
-                            start_x, start_y, end_x, end_y, did_hit = _clip_ray(ray, max_ray_m)
-                            if did_hit:
-                                self._occ_map.ray_update_gaussian(start_x, start_y, end_x, end_y, _GAUSSIAN_SIGMA_M)
-                            else:
-                                self._occ_map.ray_update(start_x, start_y, end_x, end_y, False)
-                        except Exception:
-                            traceback.print_exc()
-                    closest_rays = sorted(
-                        depth_rays,
-                        key=lambda r: (r.end_x - agent_pos.x) ** 2 + (r.end_y - agent_pos.y) ** 2,
-                    )[:5]
-                    for ray in closest_rays:
-                        dist = ((ray.end_x - agent_pos.x) ** 2 + (ray.end_y - agent_pos.y) ** 2) ** 0.5
-                        value = self._occ_map.get_cell_value(ray.end_x, ray.end_y)
-                        if not value:
-                            continue
-                        flag = " <-- CLEARED" if value is not None and value < 0.5 else ""
+                self._obstacle_mapper.process_depth(depth_input)
             except Exception:
                 traceback.print_exc()
 
     def _stream_agent_heading(self) -> None:
         try:
-            for _x, _y, heading in self._client.stream_positions():
+            for _, _, heading in self._client.stream_positions():
                 if self._stop_event.is_set():
                     break
                 with self._pos_lock:
@@ -372,14 +232,9 @@ class RemoteControl:
                             self._agent_frame = decoded
                 with self._pos_lock:
                     agent_pos = self._agent_pos
-                with self._occ_lock:
-                    if rays:
-                        for sx, sy, ex, ey, did_collide in rays:
-                            try:
-                                self._occ_map.ray_update(sx, sy, ex, ey, did_collide)
-                            except Exception:
-                                traceback.print_exc()
-                if cone and self._cone_depth_processor is not None and self._cone_intrinsics is not None and agent_pos is not None:
+                if rays:
+                    self._obstacle_mapper.apply_rays(rays)
+                if cone and self._cone_depth_processor is not None and agent_pos is not None:
                     ultrasonic_min, heading = cone
                     frame = self._agent_frame
                     try:

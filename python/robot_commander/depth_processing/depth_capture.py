@@ -10,7 +10,7 @@ from robot_commander.sensor.range_reading import RangeReading
 @dataclass
 class DepthCapture:
     frame: np.ndarray
-    calibrated_depth: np.ndarray
+    depth: np.ndarray
     cone_mask: np.ndarray
     ray_ends: np.ndarray  # (N, 2) float32, world-frame obstacle endpoints
     agent_x: float
@@ -18,13 +18,14 @@ class DepthCapture:
     heading: float
     ultrasonic_min: float
     intrinsics: Intrinsics
+    is_calibrated: bool = True
 
 
 def save(capture: DepthCapture, path: Path) -> None:
     np.savez(
         path,
         frame=capture.frame,
-        calibrated_depth=capture.calibrated_depth,
+        depth=capture.depth,
         cone_mask=capture.cone_mask,
         ray_ends=capture.ray_ends,
         agent_x=capture.agent_x,
@@ -35,6 +36,7 @@ def save(capture: DepthCapture, path: Path) -> None:
         dist_coeffs=capture.intrinsics.dist_coeffs,
         intrinsics_rms_error=capture.intrinsics.rms_error,
         intrinsics_image_size=np.array(capture.intrinsics.image_size),
+        is_calibrated=np.array(capture.is_calibrated),
     )
 
 
@@ -46,9 +48,11 @@ def load(path: Path) -> DepthCapture:
         rms_error=float(data["intrinsics_rms_error"]),
         image_size=tuple(data["intrinsics_image_size"].tolist()),
     )
+    depth_key = "depth" if "depth" in data else "calibrated_depth"
+    is_calibrated = bool(data["is_calibrated"]) if "is_calibrated" in data else True
     return DepthCapture(
         frame=data["frame"],
-        calibrated_depth=data["calibrated_depth"],
+        depth=data[depth_key],
         cone_mask=data["cone_mask"],
         ray_ends=data["ray_ends"],
         agent_x=float(data["agent_x"]),
@@ -56,6 +60,7 @@ def load(path: Path) -> DepthCapture:
         heading=float(data["heading"]),
         ultrasonic_min=float(data["ultrasonic_min"]),
         intrinsics=intrinsics,
+        is_calibrated=is_calibrated,
     )
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from robot_commander.remote_control.controller import _clip_ray, _halve_ray
+from robot_commander.depth_processing.depth_frame import _clip_ray, _halve_ray
 from robot_commander.sensor.range_reading import RangeReading
 
 
