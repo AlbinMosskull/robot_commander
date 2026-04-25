@@ -48,6 +48,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
         self._agent.Scout()
         return agent_pb2.Empty()
 
+    def EnablePayload(self, request, context):
+        self._agent.EnablePayload()
+        return agent_pb2.Empty()
+
     def StreamAgentUpdate(self, request, context):
         while context.is_active():
             frame = self._agent.GetCameraReading()
@@ -57,6 +61,11 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
                 if ok:
                     camera_frame_jpg = buf.tobytes()
 
+            pending_payload = self._agent.GetPendingPayload()
+            kwargs = {}
+            if pending_payload is not None:
+                kwargs["payload_frame_jpg"] = pending_payload
+
             ultrasonic_min = self._agent.GetUltrasonicMin()
             if ultrasonic_min is not None:
                 yield agent_pb2.AgentUpdate(
@@ -65,6 +74,7 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
                         ultrasonic_min_m=ultrasonic_min,
                         heading=self._agent.GetHeading(),
                     ),
+                    **kwargs,
                 )
             else:
                 readings = self._agent.GetSensorReading()
@@ -79,9 +89,10 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
                             )
                             for r in readings
                         ]),
+                        **kwargs,
                     )
-                elif camera_frame_jpg:
-                    yield agent_pb2.AgentUpdate(camera_frame_jpg=camera_frame_jpg)
+                else:
+                    yield agent_pb2.AgentUpdate(camera_frame_jpg=camera_frame_jpg, **kwargs)
 
             time.sleep(1 / _STREAM_HZ)
 

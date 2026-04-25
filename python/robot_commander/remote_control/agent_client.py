@@ -31,6 +31,9 @@ class AgentClient:
     def scout(self) -> None:
         self._stub.Scout(agent_pb2.Empty())
 
+    def enable_payload(self) -> None:
+        self._stub.EnablePayload(agent_pb2.Empty())
+
     def stream_positions(self):
         for pos in self._stub.StreamPosition(agent_pb2.Empty()):
             yield pos.x, pos.y, pos.heading
@@ -38,15 +41,16 @@ class AgentClient:
     def stream_agent_updates(self):
         for update in self._stub.StreamAgentUpdate(agent_pb2.Empty()):
             camera_frame_jpg = update.camera_frame_jpg or None
+            payload_frame_jpg = update.payload_frame_jpg or None
             sensor_case = update.WhichOneof("sensor_readings")
             if sensor_case == "ray_batch":
                 rays = [(r.start_x, r.start_y, r.end_x, r.end_y, r.did_collide)
                         for r in update.ray_batch.rays]
-                yield camera_frame_jpg, rays, None
+                yield camera_frame_jpg, rays, None, payload_frame_jpg
             elif sensor_case == "cone":
-                yield camera_frame_jpg, None, (update.cone.ultrasonic_min_m, update.cone.heading)
+                yield camera_frame_jpg, None, (update.cone.ultrasonic_min_m, update.cone.heading), payload_frame_jpg
             else:
-                yield camera_frame_jpg, None, None
+                yield camera_frame_jpg, None, None, payload_frame_jpg
 
     def close(self) -> None:
         self._channel.close()

@@ -11,6 +11,7 @@ service AgentControl {
   rpc StreamAgentUpdate (Empty) returns (stream AgentUpdate);
   rpc RunCommand (CommandRequest) returns (Empty);
   rpc Scout (Empty) returns (Empty);
+  rpc EnablePayload (Empty) returns (Empty);
 }
 
 message Path {
@@ -54,6 +55,7 @@ message AgentUpdate {
     RayBatch ray_batch = 2;
     ConeReading cone = 3;
   }
+  optional bytes payload_frame_jpg = 4;
 }
 
 message CommandRequest {

@@ -31,21 +31,14 @@ def _numpy_bgr_to_pixmap(frame: np.ndarray) -> QPixmap:
     return QPixmap.fromImage(image)
 
 
-def _render_depth_map(depth: np.ndarray, cone_mask: np.ndarray) -> np.ndarray:
-    masked = np.where(cone_mask, depth, 0.0).astype(np.float32)
-    valid = masked[cone_mask]
+def _render_depth_map(depth: np.ndarray) -> np.ndarray:
+    depth_f = depth.astype(np.float32)
+    valid = depth_f[depth_f > 0]
     if valid.size == 0:
         return np.zeros((*depth.shape, 3), dtype=np.uint8)
-    normalized = np.clip(masked / valid.max(), 0.0, 1.0)
+    normalized = np.clip(depth_f / valid.max(), 0.0, 1.0)
     gray = (normalized * 255).astype(np.uint8)
     return cv2.applyColorMap(gray, cv2.COLORMAP_PLASMA)
-
-
-def _render_frame_with_cone_mask(frame: np.ndarray, cone_mask: np.ndarray) -> np.ndarray:
-    overlay = frame.copy()
-    green_tint = np.array([0, 180, 0], dtype=np.uint8)
-    overlay[cone_mask] = (overlay[cone_mask] * 0.5 + green_tint * 0.5).astype(np.uint8)
-    return overlay
 
 
 def _render_top_down_rays(capture: DepthCapture) -> np.ndarray:
@@ -82,8 +75,8 @@ def _render_top_down_rays(capture: DepthCapture) -> np.ndarray:
 
 
 def _composite(capture: DepthCapture, target_width: int, target_height: int) -> np.ndarray:
-    frame_view = _render_frame_with_cone_mask(capture.frame, capture.cone_mask)
-    depth_view = _render_depth_map(capture.depth, capture.cone_mask)
+    frame_view = capture.frame
+    depth_view = _render_depth_map(capture.depth)
     rays_view = _render_top_down_rays(capture)
 
     panel_w = target_width // 3

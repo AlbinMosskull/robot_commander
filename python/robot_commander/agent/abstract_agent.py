@@ -33,3 +33,9 @@ class AbstractAgent(ABC):
 
     @abstractmethod
     def Scout(self) -> None: ...
+
+    @abstractmethod
+    def EnablePayload(self) -> None: ...
+
+    @abstractmethod
+    def GetPendingPayload(self) -> bytes | None: ...

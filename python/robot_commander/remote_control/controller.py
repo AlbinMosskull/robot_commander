@@ -65,6 +65,8 @@ class RemoteControl:
 
         self._agent_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
+        self._payload_frame: np.ndarray | None = None
+        self._payload_lock = threading.Lock()
         self._stop_event = threading.Event()
 
         self._agent_update_thread: threading.Thread | None = None
@@ -190,6 +192,15 @@ class RemoteControl:
         with self._frame_lock:
             return self._agent_frame
 
+    @property
+    def latest_payload_frame(self) -> np.ndarray | None:
+        with self._payload_lock:
+            return self._payload_frame
+
+    def enable_payload(self) -> None:
+        if self._client is not None:
+            self._client.enable_payload()
+
     def _depth_worker(self) -> None:
         while not self._stop_event.is_set():
             job = self._depth_queue.get()
@@ -220,7 +231,7 @@ class RemoteControl:
 
     def _stream_agent_updates(self) -> None:
         try:
-            for camera_frame_jpg, rays, cone in self._client.stream_agent_updates():
+            for camera_frame_jpg, rays, cone, payload_frame_jpg in self._client.stream_agent_updates():
                 if self._stop_event.is_set():
                     break
                 if self.connection_lost:
@@ -230,6 +241,11 @@ class RemoteControl:
                     if decoded is not None:
                         with self._frame_lock:
                             self._agent_frame = decoded
+                if payload_frame_jpg is not None:
+                    decoded_payload = cv2.imdecode(np.frombuffer(payload_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                    if decoded_payload is not None:
+                        with self._payload_lock:
+                            self._payload_frame = decoded_payload
                 with self._pos_lock:
                     agent_pos = self._agent_pos
                 if rays:

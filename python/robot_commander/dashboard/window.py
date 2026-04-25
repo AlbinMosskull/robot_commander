@@ -11,6 +11,7 @@ from robot_commander.dashboard.agent_camera import AgentCamera
 from robot_commander.dashboard.camera_widget import CameraWidget
 from robot_commander.dashboard.depth_widget import DepthWidget
 from robot_commander.dashboard.map_widget import MapWidget
+from robot_commander.dashboard.payload_widget import PayloadWidget
 from robot_commander.dashboard.status_bar import StatusBarWidget
 from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
@@ -103,10 +104,12 @@ class DashboardWindow(QMainWindow):
         self._cam_pov_widget = CameraWidget(camera_pov, "POV CAMERA (CAM-01)")
         self._cam_overhead_widget = CameraWidget(camera_overhead, "OVERHEAD ANGLE (CAM-02)")
         self._depth_widget = DepthWidget(self._controller)
+        self._payload_widget = PayloadWidget(self._controller)
 
         right_layout.addWidget(self._cam_pov_widget, stretch=1)
         right_layout.addWidget(self._cam_overhead_widget, stretch=1)
         right_layout.addWidget(self._depth_widget, stretch=1)
+        right_layout.addWidget(self._payload_widget, stretch=1)
 
         main_layout.addWidget(self._map_widget, stretch=3)
         main_layout.addWidget(right_panel, stretch=2)
@@ -118,6 +121,8 @@ class DashboardWindow(QMainWindow):
             self._controller.set_offset_waypoint(math.pi / 2, 0.20)
         elif event.key() == Qt.Key.Key_S and self._client is not None:
             threading.Thread(target=self._client.scout, daemon=True).start()
+        elif event.key() == Qt.Key.Key_P and self._client is not None:
+            threading.Thread(target=self._controller.enable_payload, daemon=True).start()
         super().keyPressEvent(event)
 
     def showEvent(self, event) -> None:

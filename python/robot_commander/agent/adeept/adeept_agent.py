@@ -2,6 +2,7 @@ import math
 import threading
 import time
 
+import cv2
 import numpy as np
 from picamera2 import Picamera2
 
@@ -86,6 +87,10 @@ class AdeeptAgent(AbstractAgent):
         self._last_motion_time: float = 0.0
         self._logger = RunLogger()
 
+        self._payload_enabled: bool = False
+        self._payload_lock = threading.Lock()
+        self._pending_payload: bytes | None = None
+
         self._raw_sensor = raw_sensor
         self._stop_event = threading.Event()
         if raw_sensor:
@@ -139,9 +144,10 @@ class AdeeptAgent(AbstractAgent):
 
     def _tick_loop(self) -> None:
         while not self._stop_event.is_set():
+            should_capture_payload = False
             with self._lock:
                 remote_timed_out = time.time() - self._last_remote_message_time > _REMOTE_TIMEOUT_S
-                if remote_timed_out and self._escape_plan:
+                if remote_timed_out and self._escape_plan and not self._waypoints:
                     self._escape_plan, self._escape_plan_idx = self._follow_waypoints(
                         self._escape_plan, self._escape_plan_idx
                     )
@@ -152,10 +158,14 @@ class AdeeptAgent(AbstractAgent):
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(
                         self._waypoints, self._waypoint_idx
                     )
-                    if had_waypoints and not self._waypoints and self._final_heading is not None:
-                        heading = self._final_heading
-                        self._final_heading = None
-                        threading.Thread(target=self._rotate_to_heading_with_override, args=(heading,), daemon=True).start()
+                    if had_waypoints and not self._waypoints:
+                        if self._final_heading is not None:
+                            heading = self._final_heading
+                            self._final_heading = None
+                            threading.Thread(target=self._rotate_to_heading_with_override, args=(heading,), daemon=True).start()
+                        if self._payload_enabled:
+                            self._payload_enabled = False
+                            should_capture_payload = True
                     active_waypoints = self._waypoints
                     active_idx = self._waypoint_idx
                 current_heading = self._heading_filter.heading
@@ -191,6 +201,13 @@ class AdeeptAgent(AbstractAgent):
                 target_y=target_y,
                 gyro_heading=log_gyro_heading,
             )
+            if should_capture_payload:
+                frame = self._camera.capture_array()
+                if frame is not None:
+                    ok, buf = cv2.imencode(".jpg", frame)
+                    if ok:
+                        with self._payload_lock:
+                            self._pending_payload = buf.tobytes()
             time.sleep(_DT)
 
     def SetWaypointList(self, waypoints: list[tuple[float, float]], final_heading: float | None = None) -> None:
@@ -209,6 +226,16 @@ class AdeeptAgent(AbstractAgent):
             self._escape_plan_idx = 0
             self._heading_aligned = False
             self._last_remote_message_time = time.time()
+
+    def EnablePayload(self) -> None:
+        with self._lock:
+            self._payload_enabled = True
+
+    def GetPendingPayload(self) -> bytes | None:
+        with self._payload_lock:
+            payload = self._pending_payload
+            self._pending_payload = None
+            return payload
 
     def GetXandY(self) -> tuple[float, float]:
         with self._lock:

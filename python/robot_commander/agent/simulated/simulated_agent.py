@@ -148,3 +148,9 @@ class SimulatedAgent(AbstractAgent):
 
     def Scout(self) -> None:
         pass
+
+    def EnablePayload(self) -> None:
+        pass
+
+    def GetPendingPayload(self) -> bytes | None:
+        return None
