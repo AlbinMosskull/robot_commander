@@ -98,6 +98,7 @@ class Navigator:
             end_x, end_y = path[-1]
             dist_to_goal = math.sqrt((end_x - goal_x) ** 2 + (end_y - goal_y) ** 2)
             at_goal = dist_to_goal < _GOAL_REACHED_THRESHOLD_M
-            self._client.set_path(path, final_heading=goal_heading if at_goal else None)
+            tracking_path = path[1:] if len(path) > 1 else path
+            self._client.set_path(tracking_path, final_heading=goal_heading if at_goal else None)
         except Exception:
             traceback.print_exc()
