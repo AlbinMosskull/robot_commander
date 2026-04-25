@@ -64,6 +64,11 @@ def _clip_ray(ray: RangeReading, max_length_m: float) -> tuple[float, float, flo
     return ray.start_x, ray.start_y, ray.start_x + dx * scale, ray.start_y + dy * scale, False
 
 
+def _halve_ray(ray: RangeReading, max_length_m: float) -> tuple[float, float, float, float]:
+    start_x, start_y, end_x, end_y, _ = _clip_ray(ray, max_length_m)
+    return start_x, start_y, start_x + (end_x - start_x) * 0.5, start_y + (end_y - start_y) * 0.5
+
+
 class RemoteControl:
     def __init__(
         self,
@@ -284,9 +289,21 @@ class RemoteControl:
                 break
             frame, ultrasonic_min, agent_pos, heading = job
             try:
-                calibrated_depth, cone_mask, _, validation = self._cone_depth_processor.process_with_validation(frame, ultrasonic_min)
+                raw_depth, calibrated_depth, cone_mask, _, validation = self._cone_depth_processor.process_with_validation(frame, ultrasonic_min)
                 if validation.disqualification_reason is not None:
-                    print(f"Depth update skipped: {validation.disqualification_reason}")
+                    print(f"Depth update (conservative): {validation.disqualification_reason}")
+                    conservative_rays = depth_to_rays(
+                        raw_depth, self._cone_intrinsics,
+                        agent_pos.x, agent_pos.y, heading,
+                    )
+                    max_ray_m = _DEPTH_RAY_RANGE_FACTOR * ultrasonic_min
+                    with self._occ_lock:
+                        for ray in conservative_rays:
+                            try:
+                                sx, sy, ex, ey = _halve_ray(ray, max_ray_m)
+                                self._occ_map.ray_update(sx, sy, ex, ey, False)
+                            except Exception:
+                                traceback.print_exc()
                     continue
                 depth_rays = depth_to_rays(
                     calibrated_depth, self._cone_intrinsics,

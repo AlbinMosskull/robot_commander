@@ -43,12 +43,12 @@ class ConeDepthProcessor:
     def process_with_mask(
         self, frame: np.ndarray, ultrasonic_min_reading: float
     ) -> tuple[np.ndarray, np.ndarray]:
-        calibrated_depth, cone_mask, _, _ = self.process_with_validation(frame, ultrasonic_min_reading)
+        _, calibrated_depth, cone_mask, _, _ = self.process_with_validation(frame, ultrasonic_min_reading)
         return calibrated_depth, cone_mask
 
     def process_with_validation(
         self, frame: np.ndarray, ultrasonic_min_reading: float
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, PlaneValidationResult]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, PlaneValidationResult]:
         raw_depth = self._get_raw_depth(frame)
         sensor_points = self._to_sensor_frame(raw_depth)
         cone_mask = self._compute_cone_mask(raw_depth, sensor_points)
@@ -59,7 +59,8 @@ class ConeDepthProcessor:
         validation_mask = obstacle_mask if obstacle_mask.any() else cone_mask
         validation = validate_ultrasonic_with_planes(sensor_points[validation_mask])
         scale = ultrasonic_min_reading / self._find_calibration_depth(raw_depth, validation_mask)
-        return (raw_depth * scale).astype(np.float32), cone_mask, validation_mask, validation
+        calibrated_depth = (raw_depth * scale).astype(np.float32)
+        return raw_depth, calibrated_depth, cone_mask, validation_mask, validation
 
     def _get_raw_depth(self, frame: np.ndarray) -> np.ndarray:
         original_h, original_w = frame.shape[:2]

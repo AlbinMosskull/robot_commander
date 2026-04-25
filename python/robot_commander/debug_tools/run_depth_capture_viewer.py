@@ -11,7 +11,9 @@ from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTE
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
 from robot_commander.depth_processing.depth_capture import load, rays_to_ends
+from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
+from robot_commander.image_processing.intrinsics import Intrinsics
 
 _DEFAULT_PATH = Path(__file__).parent / "latest_depth_capture.npz"
 _HEADING_ARROW_LENGTH_M = 0.3
@@ -53,7 +55,7 @@ def _show(
     capture = load(capture_path)
 
     depth_processor = _build_depth_processor(capture)
-    calibrated_depth, cone_mask, validation_mask, validation = depth_processor.process_with_validation(
+    raw_depth, calibrated_depth, cone_mask, validation_mask, validation = depth_processor.process_with_validation(
         capture.frame, capture.ultrasonic_min
     )
 
@@ -68,13 +70,14 @@ def _show(
     ray_ends = rays_to_ends(rays)
     print(f"ray_ends (regenerated): {ray_ends.shape}")
 
-    fig, axes = plt.subplots(1, 4, figsize=(22, 5))
+    fig, axes = plt.subplots(1, 5, figsize=(27, 5))
     fig.suptitle(f"Depth capture — {capture_path.name}")
 
     _draw_frame_with_cone_mask(axes[0], capture.frame, cone_mask)
     _draw_depth_map(axes[1], calibrated_depth)
     _draw_top_down_rays(axes[2], capture.agent_x, capture.agent_y, capture.heading, ray_ends)
     _draw_plane_inliers(axes[3], calibrated_depth, validation_mask, validation)
+    _draw_all_planes(axes[4], raw_depth, capture.intrinsics)
 
     plt.tight_layout()
 
@@ -173,6 +176,41 @@ def _draw_plane_inliers(ax, depth: np.ndarray, cone_mask: np.ndarray, validation
         label = f"P{i}: fill={candidate.cone_fill_fraction:.2f} ang={candidate.normal_angle_deg:.0f}°"
         handles.append((patch, label))
 
+    if handles:
+        ax.legend(
+            [h for h, _ in handles],
+            [l for _, l in handles],
+            loc="lower left",
+            fontsize=7,
+            framealpha=0.7,
+        )
+
+
+def _draw_all_planes(ax, raw_depth: np.ndarray, intrinsics: Intrinsics) -> None:
+    valid_mask = raw_depth > 0
+    valid_pixels = np.argwhere(valid_mask)
+    rows, cols = valid_pixels[:, 0], valid_pixels[:, 1]
+    z = raw_depth[valid_mask].astype(np.float64)
+    points = np.stack([
+        (cols - intrinsics.cx) * z / intrinsics.fx,
+        (rows - intrinsics.cy) * z / intrinsics.fy,
+        z,
+    ], axis=-1)
+
+    planes = detect_planes(points, n_planes=len(_PLANE_COLORS))
+
+    rgb_overlay = np.zeros((*raw_depth.shape, 3), dtype=np.uint8)
+    handles = []
+    for i, plane in enumerate(planes):
+        color_name = _PLANE_COLORS[i % len(_PLANE_COLORS)]
+        rgb_overlay[valid_pixels[plane.inliers, 0], valid_pixels[plane.inliers, 1]] = _color_to_rgb(color_name)
+        inlier_count = plane.inliers.sum()
+        patch = plt.Rectangle((0, 0), 1, 1, color=color_name)
+        handles.append((patch, f"P{i}: {inlier_count} pts ({100 * inlier_count / len(points):.1f}%)"))
+
+    ax.imshow(rgb_overlay)
+    ax.set_title("All planes (full image)")
+    ax.axis("off")
     if handles:
         ax.legend(
             [h for h, _ in handles],
