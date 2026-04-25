@@ -119,6 +119,11 @@ class RemoteControl:
             return self._localization_miss_count >= LOCALIZATION_LOST_THRESHOLD
 
     @property
+    def has_localization(self) -> bool:
+        with self._pos_lock:
+            return self._localization_miss_count == 0
+
+    @property
     def localization_jammed(self) -> bool:
         return self._localization_jammed
 
@@ -234,18 +239,17 @@ class RemoteControl:
             for camera_frame_jpg, rays, cone, payload_frame_jpg in self._client.stream_agent_updates():
                 if self._stop_event.is_set():
                     break
-                if self.connection_lost:
-                    continue
-                if camera_frame_jpg is not None:
-                    decoded = cv2.imdecode(np.frombuffer(camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
-                    if decoded is not None:
-                        with self._frame_lock:
-                            self._agent_frame = decoded
-                if payload_frame_jpg is not None:
-                    decoded_payload = cv2.imdecode(np.frombuffer(payload_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
-                    if decoded_payload is not None:
-                        with self._payload_lock:
-                            self._payload_frame = decoded_payload
+                if self.has_localization:
+                    if camera_frame_jpg is not None:
+                        decoded = cv2.imdecode(np.frombuffer(camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                        if decoded is not None:
+                            with self._frame_lock:
+                                self._agent_frame = decoded
+                    if payload_frame_jpg is not None:
+                        decoded_payload = cv2.imdecode(np.frombuffer(payload_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
+                        if decoded_payload is not None:
+                            with self._payload_lock:
+                                self._payload_frame = decoded_payload
                 with self._pos_lock:
                     agent_pos = self._agent_pos
                 if rays:
