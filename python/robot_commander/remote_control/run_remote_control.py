@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QApplication
 from robot_commander.dashboard.slideshow_window import SlideshowWindow
 from robot_commander.dashboard.window import DashboardWindow
 
-_DEBUG_DIR = Path("plots/debug")
+_MAP_BUILD_PROGRESS_DIR = Path("plots/debug")
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
@@ -23,17 +23,17 @@ def main():
     app = QApplication(sys.argv)
     dashboard = DashboardWindow(show_escape_plan=True)
 
-    debug_images = (
+    map_build_images = (
         sorted(
-            (p for p in _DEBUG_DIR.glob("*") if p.suffix.lower() in _IMAGE_SUFFIXES),
+            (p for p in _MAP_BUILD_PROGRESS_DIR.glob("*") if p.suffix.lower() in _IMAGE_SUFFIXES),
             key=lambda p: p.name,
         )
-        if _DEBUG_DIR.exists()
+        if _MAP_BUILD_PROGRESS_DIR.exists()
         else []
     )
 
-    if debug_images:
-        slideshow = SlideshowWindow(debug_images)
+    if map_build_images:
+        slideshow = SlideshowWindow(map_build_images)
         slideshow.finished.connect(dashboard.show)
         slideshow.show()
     else:
