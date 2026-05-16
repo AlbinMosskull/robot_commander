@@ -38,7 +38,7 @@ def build_controller(client: AgentClient | None, overhead_camera: Camera) -> "Re
     localizer = Localizer(detector, overhead_intrinsics.camera_matrix, cfg.tag.size_m,
                           dist_coeffs=overhead_intrinsics.dist_coeffs)
     map_coords = MapCoordinates.load(cfg.map.stencil_path)
-    heading_offset = math.radians(cfg.localization.heading_offset_deg)
+    heading_offset = math.radians(cfg.agent.heading_offset_deg)
     camera_localizer = CameraLocalizer(localizer, map_coords, heading_offset=heading_offset)
 
     cone_geometry = ConeGeometry(half_angle_radians=math.radians(cfg.depth.cone_half_angle_deg))

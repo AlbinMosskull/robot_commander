@@ -74,7 +74,7 @@ def main():
         print(f"  Distance:         {distance:.3f} m over {_FORWARD_DURATION_S}s")
         print(f"  V_FORWARD_M_S   = {distance / _FORWARD_DURATION_S:.3f}")
         print(f"  Forward angle:    {math.degrees(forward_angle):.1f}°  (initial heading: {math.degrees(initial_pose.heading):.1f}°)")
-        print(f"  HEADING_OFFSET  = {math.degrees(heading_offset):.1f}°  ({heading_offset:.4f} rad)  (config: {_cfg.localization.heading_offset_deg:.1f}°)")
+        print(f"  HEADING_OFFSET  = {math.degrees(heading_offset):.1f}°  ({heading_offset:.4f} rad)  (config: {_cfg.agent.heading_offset_deg:.1f}°)")
 
         input("\nPress Enter to start rotation calibration...")
         client.run_command("left", _ROTATE_DURATION_S)

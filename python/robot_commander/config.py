@@ -30,6 +30,12 @@ class TagConfig:
 
 @dataclass(frozen=True)
 class AgentConfig:
+    v_forward_m_s: float
+    heading_offset_deg: float
+
+
+@dataclass(frozen=True)
+class ConnectionConfig:
     host: str
     port: int
 
@@ -37,11 +43,6 @@ class AgentConfig:
 @dataclass(frozen=True)
 class MapConfig:
     stencil_path: Path
-
-
-@dataclass(frozen=True)
-class LocalizationConfig:
-    heading_offset_deg: float
 
 
 @dataclass(frozen=True)
@@ -56,8 +57,8 @@ class Config:
     checkerboard: CheckerboardConfig
     tag: TagConfig
     agent: AgentConfig
+    connection: ConnectionConfig
     map: MapConfig
-    localization: LocalizationConfig
     depth: DepthConfig
 
 
@@ -83,14 +84,15 @@ def load(path: Path = _CONFIG_PATH) -> Config:
             size_m=raw["tag"]["size_m"],
         ),
         agent=AgentConfig(
-            host=raw["agent"]["host"],
-            port=raw["agent"]["port"],
+            v_forward_m_s=raw["agent"]["v_forward_m_s"],
+            heading_offset_deg=raw["agent"]["heading_offset_deg"],
+        ),
+        connection=ConnectionConfig(
+            host=raw["connection"]["host"],
+            port=raw["connection"]["port"],
         ),
         map=MapConfig(
             stencil_path=Path(raw["map"]["stencil_path"]),
-        ),
-        localization=LocalizationConfig(
-            heading_offset_deg=raw["localization"]["heading_offset_deg"],
         ),
         depth=DepthConfig(
             cone_half_angle_deg=raw["depth"]["cone_half_angle_deg"],

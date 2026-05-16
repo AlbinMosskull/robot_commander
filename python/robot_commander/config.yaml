@@ -4,9 +4,7 @@ camera:
   height: 1440
   preview_width: 960
   preview_height: 540
-  # Manual exposure in 100µs steps (UVC absolute time, range 1–10000).
-  # null = leave on auto. Start around 50 (5ms / 1/200s) and tune from there.
-  # Lower = shorter shutter = less motion blur, but darker image.
+  # Lower => shorter shutter => less motion blur, but darker image.
   exposure: 400
 
 checkerboard:
@@ -18,14 +16,15 @@ tag:
   size_m: 0.03
 
 agent:
-  host: 192.168.0.43  # localhost
+  v_forward_m_s: 0.045
+  heading_offset_deg: 87
+
+connection:
+  host: 192.168.0.43
   port: 50051
 
 map:
   stencil_path: plots/output/stencil_map.json
-
-localization:
-  heading_offset_deg: 87
 
 depth:
   cone_half_angle_deg: 15.0

@@ -2,8 +2,9 @@
 
 import math
 
-V_FORWARD_M_S = 0.045
-OMEGA_MAX_RAD_S = 0.347
+from robot_commander.config import load as load_config
+
+V_FORWARD_M_S = load_config().agent.v_forward_m_s
 HEADING_ALIGNMENT_RAD = math.pi / 6
 WAYPOINT_THRESHOLD_M = 0.01
 

@@ -19,7 +19,7 @@ def main():
     localizer = Localizer(detector, cam_intrinsics.camera_matrix, _cfg.tag.size_m,
                           dist_coeffs=cam_intrinsics.dist_coeffs)
     map_coords = MapCoordinates.load(_cfg.map.stencil_path)
-    heading_offset_rad = math.radians(_cfg.localization.heading_offset_deg)
+    heading_offset_rad = math.radians(_cfg.agent.heading_offset_deg)
     camera_localizer = CameraLocalizer(localizer, map_coords, heading_offset=heading_offset_rad)
 
     with WebCamera() as cam:
