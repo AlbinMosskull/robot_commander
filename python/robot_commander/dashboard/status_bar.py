@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
-from robot_commander.remote_control.controller import LOCALIZATION_LOST_THRESHOLD, RemoteControl
+from robot_commander.remote_control.controller import RemoteControl
 
-_LOCALIZATION_SEARCHING_THRESHOLD = 5
+_LOCALIZATION_SEARCHING_THRESHOLD_S = 5.0
 
 
 class StatusBarWidget(QWidget):
@@ -64,15 +64,15 @@ class StatusBarWidget(QWidget):
         self._update_status()
 
     def _update_status(self) -> None:
-        miss_count = self._controller.localization_miss_count
-        if miss_count == 0:
+        lost_seconds = self._controller.localization_lost_seconds
+        if lost_seconds is None:
             text = "LOCALIZED"
             color = "#00ff88"
-        elif miss_count < _LOCALIZATION_SEARCHING_THRESHOLD:
-            text = f"SEARCHING ({miss_count})"
+        elif lost_seconds < _LOCALIZATION_SEARCHING_THRESHOLD_S:
+            text = f"SEARCHING ({lost_seconds:.0f}s)"
             color = "#ffaa00"
         else:
-            text = f"NO SIGNAL ({miss_count})"
+            text = f"NO SIGNAL ({lost_seconds:.0f}s)"
             color = "#ff4444"
         self._status_value.setText(text)
         self._status_value.setStyleSheet(

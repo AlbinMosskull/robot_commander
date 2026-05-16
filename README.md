@@ -38,9 +38,11 @@ Create a virtual environment and install remote control dependencies
     ```bash
          sudo apt-get install i2c-tools python3-smbus libcap-dev
     ```
-3. Create a virtual environment and install agent dependencies only 
+3. Create a virtual environment with access to system site-packages (required for
+   `libcamera` and `picamera2`, which are installed system-wide on Raspberry Pi OS
+   and cannot be installed via pip)
     ```bash
-        uv venv
+        uv venv --system-site-packages
         source .venv/bin/activate
         uv sync --extra agent
     ```

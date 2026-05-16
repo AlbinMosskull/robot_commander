@@ -57,8 +57,8 @@ def test_agent_moves_toward_waypoint(agent_server_and_client):
 def test_agent_update_stream_delivers_ray_batch(agent_server_and_client):
     _, client = agent_server_and_client
     collected_updates = []
-    for camera_frame, rays, cone in client.stream_agent_updates():
-        collected_updates.append((camera_frame, rays, cone))
+    for camera_frame, rays, cone, payload_frame in client.stream_agent_updates():
+        collected_updates.append((camera_frame, rays, cone, payload_frame))
         if len(collected_updates) >= 3:
             break
     assert len(collected_updates) == 3

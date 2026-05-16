@@ -19,7 +19,7 @@ from robot_commander.remote_control.agent_client import AgentClient
 from robot_commander.remote_control.navigation import Navigator
 from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 
-LOCALIZATION_LOST_THRESHOLD = 30
+LOCALIZATION_LOST_THRESHOLD_S = 1.0
 _ESCAPE_POSITION = (0.2, 0.3)
 _INITIAL_FREE_RADIUS_M = 0.3
 
@@ -58,7 +58,7 @@ class RemoteControl:
 
         self._agent_pos: WorldPose | None = None
         self._agent_heading: float | None = None
-        self._localization_miss_count: int = LOCALIZATION_LOST_THRESHOLD
+        self._localization_lost_since: float | None = time.monotonic()
         self._escape_plan: list[tuple[float, float]] = []
         self._last_escape_plan_time: float | None = None
         self._localization_jammed: bool = False
@@ -111,19 +111,21 @@ class RemoteControl:
             self._client.close()
 
     @property
-    def localization_miss_count(self) -> int:
+    def localization_lost_seconds(self) -> float | None:
         with self._pos_lock:
-            return self._localization_miss_count
+            if self._localization_lost_since is None:
+                return None
+            return time.monotonic() - self._localization_lost_since
 
     @property
     def connection_lost(self) -> bool:
-        with self._pos_lock:
-            return self._localization_miss_count >= LOCALIZATION_LOST_THRESHOLD
+        lost = self.localization_lost_seconds
+        return lost is not None and lost >= LOCALIZATION_LOST_THRESHOLD_S
 
     @property
     def has_localization(self) -> bool:
         with self._pos_lock:
-            return self._localization_miss_count == 0
+            return self._localization_lost_since is None
 
     @property
     def localization_jammed(self) -> bool:
@@ -146,11 +148,9 @@ class RemoteControl:
         with self._pos_lock:
             if pose is not None:
                 self._agent_pos = pose
-                self._localization_miss_count = 0
-            else:
-                self._localization_miss_count = min(
-                    self._localization_miss_count + 1, LOCALIZATION_LOST_THRESHOLD
-                )
+                self._localization_lost_since = None
+            elif self._localization_lost_since is None:
+                self._localization_lost_since = time.monotonic()
         if pose is not None and not self._robot_first_detected:
             self._obstacle_mapper.mark_free_radius(pose.x, pose.y, _INITIAL_FREE_RADIUS_M)
             self._robot_first_detected = True

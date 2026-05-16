@@ -16,26 +16,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-agent = [
-    "adafruit-circuitpython-ads7830",
-    "adafruit-circuitpython-busdevice",
-    "adafruit-circuitpython-motor",
-    "adafruit-circuitpython-pca9685",
-    "adafruit-circuitpython-ssd1306",
-    "rpi-lgpio",
-    "smbus2",
-    "smbus",
-    "gpiozero",
-    "grpcio>=1.73.0",
-    "luma.oled",
-    "mpu6050-raspberrypi",
-    "numpy>=1.26.0",
-    "opencv-contrib-python>=4.13.0.92",
-    "picamera2",
-    "pigpio",
-    "psutil",
-    "pyyaml>=6.0.3",
-]
 remote-station = [
     "pillow>=12.1.1",
     "pyqt6>=6.11.0",

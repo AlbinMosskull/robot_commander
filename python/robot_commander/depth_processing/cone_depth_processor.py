@@ -58,7 +58,7 @@ class ConeDepthProcessor:
         obstacle_mask = cone_mask & ~floor_mask
         validation_mask = obstacle_mask if obstacle_mask.any() else cone_mask
         validation = validate_ultrasonic_with_planes(sensor_points[validation_mask])
-        scale = ultrasonic_min_reading / self._find_calibration_depth(raw_depth, validation_mask)
+        scale = ultrasonic_min_reading / self._find_calibration_depth(sensor_points[..., 2], validation_mask)
         calibrated_depth = (raw_depth * scale).astype(np.float32)
         return raw_depth, calibrated_depth, cone_mask, validation_mask, validation
 
@@ -105,6 +105,6 @@ class ConeDepthProcessor:
         polar_angle = np.arctan2(radial, sensor_z)
         return (depth > 0) & (sensor_z > 0) & (polar_angle < self._cone_geometry.half_angle_radians)
 
-    def _find_calibration_depth(self, depth: np.ndarray, mask: np.ndarray) -> float:
-        valid = depth[mask & (depth > 0)]
+    def _find_calibration_depth(self, sensor_z: np.ndarray, mask: np.ndarray) -> float:
+        valid = sensor_z[mask & (sensor_z > 0)]
         return float(np.percentile(valid, _CALIBRATION_PERCENTILE))

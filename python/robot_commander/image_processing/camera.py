@@ -44,6 +44,8 @@ class WebCamera(Camera):
         self._cap = cv2.VideoCapture(device_index)
         if not self._cap.isOpened():
             raise RuntimeError(f"Could not open camera at device index {device_index}")
+        if width is not None or height is not None:
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         if width is not None:
             self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         if height is not None:

@@ -14,7 +14,7 @@ from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.landmark.landmark_plane import LandmarkPlane
 from robot_commander.sensor.range_reading import RangeReading
 
-_DEPTH_RAY_RANGE_FACTOR = 1.5
+_DEPTH_RAY_RANGE_FACTOR = 2.5
 
 
 @dataclass
