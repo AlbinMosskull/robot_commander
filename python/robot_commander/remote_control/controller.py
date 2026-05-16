@@ -1,3 +1,4 @@
+import math
 import queue
 import threading
 import time
@@ -8,16 +9,48 @@ import cv2
 import numpy as np
 
 from robot_commander import WorldPosition2d
+from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.config import load as load_config
-from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
+from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
 from robot_commander.depth_processing.depth_capture import DepthCapture
 from robot_commander.depth_processing.depth_frame import DepthFrameInput
-from robot_commander.image_processing.intrinsics import Intrinsics
+from robot_commander.image_processing import intrinsics as calibration
+from robot_commander.image_processing.camera import Camera
+from robot_commander.image_processing.intrinsics import AGENT_CAMERA_PATH, Intrinsics
+from robot_commander.image_processing.tag_detector import TagDetector
+from robot_commander.localization.camera_localizer import CameraLocalizer
+from robot_commander.localization.localizer import Localizer
 from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 from robot_commander.remote_control.navigation import Navigator
 from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
+
+def build_controller(client: AgentClient | None, overhead_camera: Camera) -> "RemoteControl":
+    if client is None:
+        return RemoteControl(None, None, overhead_camera=overhead_camera)
+
+    cfg = load_config()
+    overhead_intrinsics = calibration.load()
+    agent_intrinsics = calibration.load(AGENT_CAMERA_PATH)
+
+    detector = TagDetector()
+    localizer = Localizer(detector, overhead_intrinsics.camera_matrix, cfg.tag.size_m,
+                          dist_coeffs=overhead_intrinsics.dist_coeffs)
+    map_coords = MapCoordinates.load(cfg.map.stencil_path)
+    heading_offset = math.radians(cfg.localization.heading_offset_deg)
+    camera_localizer = CameraLocalizer(localizer, map_coords, heading_offset=heading_offset)
+
+    cone_geometry = ConeGeometry(half_angle_radians=math.radians(cfg.depth.cone_half_angle_deg))
+    depth_processor = ConeDepthProcessor(
+        intrinsics=agent_intrinsics,
+        camera_T_sensor=CAMERA_T_SENSOR_CENTER,
+        cone_geometry=cone_geometry,
+    )
+
+    return RemoteControl(client, camera_localizer, cone_depth_processor=depth_processor,
+                         cone_intrinsics=agent_intrinsics, overhead_camera=overhead_camera)
+
 
 LOCALIZATION_LOST_THRESHOLD_S = 1.0
 _ESCAPE_POSITION = (0.2, 0.3)
@@ -42,10 +75,12 @@ class RemoteControl:
         localizer: WorldLocalizer | None,
         cone_depth_processor: ConeDepthProcessor | None = None,
         cone_intrinsics: Intrinsics | None = None,
+        overhead_camera: Camera | None = None,
     ):
         self._client = client
         self._localizer = localizer
         self._cone_depth_processor = cone_depth_processor
+        self._overhead_camera = overhead_camera
 
         self._map_coords = MapCoordinates.load(load_config().map.stencil_path)
 
@@ -67,10 +102,13 @@ class RemoteControl:
 
         self._agent_frame: np.ndarray | None = None
         self._frame_lock = threading.Lock()
+        self._overhead_frame: np.ndarray | None = None
+        self._overhead_frame_lock = threading.Lock()
         self._payload_frame: np.ndarray | None = None
         self._payload_lock = threading.Lock()
         self._stop_event = threading.Event()
 
+        self._overhead_update_thread: threading.Thread | None = None
         self._agent_update_thread: threading.Thread | None = None
         self._agent_heading_thread: threading.Thread | None = None
         self._depth_worker_thread: threading.Thread | None = None
@@ -93,9 +131,12 @@ class RemoteControl:
         return self._map_coords.width_px, self._map_coords.height_px
 
     def start(self) -> None:
+        self._stop_event.clear()
+        if self._overhead_camera is not None:
+            self._overhead_update_thread = threading.Thread(target=self._stream_overhead_camera, daemon=True)
+            self._overhead_update_thread.start()
         if self._client is None:
             return
-        self._stop_event.clear()
         self._agent_update_thread = threading.Thread(target=self._stream_agent_updates, daemon=True)
         self._agent_update_thread.start()
         self._agent_heading_thread = threading.Thread(target=self._stream_agent_heading, daemon=True)
@@ -109,6 +150,8 @@ class RemoteControl:
         self._depth_queue.put(None)
         if self._client is not None:
             self._client.close()
+        if self._overhead_camera is not None:
+            self._overhead_camera.release()
 
     @property
     def localization_lost_seconds(self) -> float | None:
@@ -197,6 +240,11 @@ class RemoteControl:
         self._navigator.set_offset_waypoint(angle_offset_rad, distance_m)
 
     @property
+    def latest_overhead_frame(self) -> np.ndarray | None:
+        with self._overhead_frame_lock:
+            return self._overhead_frame
+
+    @property
     def latest_agent_frame(self) -> np.ndarray | None:
         with self._frame_lock:
             return self._agent_frame
@@ -227,6 +275,14 @@ class RemoteControl:
                 self._obstacle_mapper.process_depth(depth_input)
             except Exception:
                 traceback.print_exc()
+
+    def _stream_overhead_camera(self) -> None:
+        while not self._stop_event.is_set():
+            ok, frame = self._overhead_camera.read()
+            if ok:
+                with self._overhead_frame_lock:
+                    self._overhead_frame = frame
+                self.update(frame)
 
     def _stream_agent_heading(self) -> None:
         try:

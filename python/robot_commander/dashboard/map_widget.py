@@ -1,31 +1,23 @@
 import math
 
-import cv2
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QMouseEvent, QPixmap
+from PyQt6.QtGui import QMouseEvent
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+import cv2
+
 from robot_commander.dashboard.map_renderer import MapRenderer
-from robot_commander.image_processing.camera import Camera
+from robot_commander.dashboard.qt_image_utils import numpy_bgr_to_pixmap
 from robot_commander.remote_control.controller import RemoteControl
 
 _DRAG_HEADING_THRESHOLD_PX = 8
 
 
-def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    height, width, channels = rgb.shape
-    bytes_per_line = channels * width
-    image = QImage(rgb.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(image)
-
-
 class MapWidget(QWidget):
-    def __init__(self, controller: RemoteControl, camera: Camera, show_escape_plan: bool = False, parent=None):
+    def __init__(self, controller: RemoteControl, show_escape_plan: bool = False, parent=None):
         super().__init__(parent)
         self._controller = controller
-        self._camera = camera
         self._renderer = MapRenderer(controller.map_coords, show_escape_plan=show_escape_plan)
         self.setStyleSheet("background-color: #0d0d0d;")
 
@@ -56,17 +48,13 @@ class MapWidget(QWidget):
         self._drag_current_frame_px: tuple[int, int] | None = None
 
     def _refresh(self) -> None:
-        ok, frame = self._camera.read()
-        if ok:
-            self._controller.update(frame)
-
         canvas = self._renderer.render(self._controller.snapshot())
 
         if self._drag_start_frame_px is not None and self._drag_current_frame_px is not None:
             self._draw_drag_preview(canvas)
 
         self._display.setPixmap(
-            _numpy_to_pixmap(canvas).scaled(
+            numpy_bgr_to_pixmap(canvas).scaled(
                 self._display.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,

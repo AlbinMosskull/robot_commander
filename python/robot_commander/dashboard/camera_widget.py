@@ -1,18 +1,8 @@
-import cv2
-import numpy as np
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from robot_commander.dashboard.qt_image_utils import numpy_bgr_to_pixmap
 from robot_commander.image_processing.camera import Camera
-
-
-def _numpy_to_pixmap(frame: np.ndarray) -> QPixmap:
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    height, width, channels = rgb.shape
-    bytes_per_line = channels * width
-    image = QImage(rgb.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(image)
 
 
 class CameraWidget(QWidget):
@@ -47,7 +37,7 @@ class CameraWidget(QWidget):
         ok, frame = self._camera.read()
         if not ok:
             return
-        pixmap = _numpy_to_pixmap(frame)
+        pixmap = numpy_bgr_to_pixmap(frame)
         self._display.setPixmap(
             pixmap.scaled(
                 self._display.size(),

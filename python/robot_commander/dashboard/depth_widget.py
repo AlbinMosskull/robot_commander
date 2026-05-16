@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from robot_commander.dashboard.qt_image_utils import numpy_bgr_to_pixmap
 from robot_commander.remote_control.controller import RemoteControl
 
 
@@ -15,13 +15,6 @@ def _signal_lost_frame(w: int, h: int) -> np.ndarray:
     (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
     cv2.putText(canvas, text, ((w - tw) // 2, (h + th) // 2), font, scale, (60, 60, 180), thickness)
     return canvas
-
-
-def _numpy_bgr_to_pixmap(frame: np.ndarray) -> QPixmap:
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    h, w, ch = rgb.shape
-    image = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(image)
 
 
 def _render_depth_map(depth: np.ndarray) -> np.ndarray:
@@ -70,7 +63,7 @@ class DepthWidget(QWidget):
             return
         if self._controller.connection_lost:
             self._display.setPixmap(
-                _numpy_bgr_to_pixmap(_signal_lost_frame(w, h)).scaled(
+                numpy_bgr_to_pixmap(_signal_lost_frame(w, h)).scaled(
                     self._display.size(),
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
@@ -82,7 +75,7 @@ class DepthWidget(QWidget):
             return
         depth_frame = cv2.resize(_render_depth_map(capture.depth), (w, h))
         self._display.setPixmap(
-            _numpy_bgr_to_pixmap(depth_frame).scaled(
+            numpy_bgr_to_pixmap(depth_frame).scaled(
                 self._display.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,

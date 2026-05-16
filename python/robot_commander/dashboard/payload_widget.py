@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from robot_commander.dashboard.qt_image_utils import numpy_bgr_to_pixmap
 from robot_commander.remote_control.controller import RemoteControl
 
 
@@ -15,13 +15,6 @@ def _no_payload_frame(w: int, h: int) -> np.ndarray:
     (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
     cv2.putText(canvas, text, ((w - tw) // 2, (h + th) // 2), font, scale, (80, 80, 80), thickness)
     return canvas
-
-
-def _numpy_bgr_to_pixmap(frame: np.ndarray) -> QPixmap:
-    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    h, w, ch = rgb.shape
-    image = QImage(rgb.data, w, h, ch * w, QImage.Format.Format_RGB888)
-    return QPixmap.fromImage(image)
 
 
 class PayloadWidget(QWidget):
@@ -59,9 +52,9 @@ class PayloadWidget(QWidget):
             return
         frame = self._controller.latest_payload_frame
         if frame is None:
-            pixmap = _numpy_bgr_to_pixmap(_no_payload_frame(w, h))
+            pixmap = numpy_bgr_to_pixmap(_no_payload_frame(w, h))
         else:
-            pixmap = _numpy_bgr_to_pixmap(frame)
+            pixmap = numpy_bgr_to_pixmap(frame)
         self._display.setPixmap(
             pixmap.scaled(
                 self._display.size(),
