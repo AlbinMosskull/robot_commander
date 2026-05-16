@@ -1,20 +1,11 @@
-import cv2
 import numpy as np
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+import cv2
 from robot_commander.dashboard.qt_image_utils import numpy_bgr_to_pixmap
+from robot_commander.dashboard.signal_lost import signal_lost_frame
 from robot_commander.remote_control.controller import RemoteControl
-
-
-def _signal_lost_frame(w: int, h: int) -> np.ndarray:
-    canvas = np.full((h, w, 3), 13, dtype=np.uint8)
-    text = "SIGNAL LOST"
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    scale, thickness = 0.8, 2
-    (tw, th), _ = cv2.getTextSize(text, font, scale, thickness)
-    cv2.putText(canvas, text, ((w - tw) // 2, (h + th) // 2), font, scale, (60, 60, 180), thickness)
-    return canvas
 
 
 def _render_depth_map(depth: np.ndarray) -> np.ndarray:
@@ -63,7 +54,7 @@ class DepthWidget(QWidget):
             return
         if self._controller.connection_lost:
             self._display.setPixmap(
-                numpy_bgr_to_pixmap(_signal_lost_frame(w, h)).scaled(
+                numpy_bgr_to_pixmap(signal_lost_frame(w, h)).scaled(
                     self._display.size(),
                     Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,

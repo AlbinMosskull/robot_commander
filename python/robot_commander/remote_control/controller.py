@@ -166,11 +166,6 @@ class RemoteControl:
         return lost is not None and lost >= LOCALIZATION_LOST_THRESHOLD_S
 
     @property
-    def has_localization(self) -> bool:
-        with self._pos_lock:
-            return self._localization_lost_since is None
-
-    @property
     def localization_jammed(self) -> bool:
         return self._localization_jammed
 
@@ -235,7 +230,7 @@ class RemoteControl:
         self._navigator.handle_click(pixel_x, pixel_y, shift_held, goal_heading)
 
     def set_offset_waypoint(self, angle_offset_rad: float, distance_m: float) -> None:
-        if self._navigator is None:
+        if self.connection_lost or self._navigator is None:
             return
         self._navigator.set_offset_waypoint(angle_offset_rad, distance_m)
 
@@ -299,7 +294,7 @@ class RemoteControl:
             for camera_frame_jpg, rays, cone, payload_frame_jpg in self._client.stream_agent_updates():
                 if self._stop_event.is_set():
                     break
-                if self.has_localization:
+                if not self.connection_lost:
                     if camera_frame_jpg is not None:
                         decoded = cv2.imdecode(np.frombuffer(camera_frame_jpg, np.uint8), cv2.IMREAD_COLOR)
                         if decoded is not None:
