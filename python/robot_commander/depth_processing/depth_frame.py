@@ -5,13 +5,8 @@ import numpy as np
 
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
-from robot_commander.depth_processing.depth_planes import (
-    LandmarkPlaneDebugResult,
-    extract_landmark_planes_debug,
-)
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
 from robot_commander.image_processing.intrinsics import Intrinsics
-from robot_commander.landmark.landmark_plane import LandmarkPlane
 from robot_commander.sensor.range_reading import RangeReading
 
 _DEPTH_RAY_RANGE_FACTOR = 2.5
@@ -35,7 +30,6 @@ class OccupancyRays:
 @dataclass
 class DepthFrameResult:
     occupancy_rays: OccupancyRays
-    landmark_plane_observations: list[LandmarkPlane]
     is_calibrated: bool
 
     frame: np.ndarray
@@ -50,7 +44,6 @@ class DepthFrameResult:
 
     validation: PlaneValidationResult
     validation_mask: np.ndarray
-    landmark_debug: LandmarkPlaneDebugResult
     depth_rays: list[RangeReading]
 
 
@@ -75,16 +68,9 @@ def process_depth_frame(
         if is_calibrated
         else _conservative_occupancy_rays(depth_rays, max_ray_m)
     )
-    landmark_debug = extract_landmark_planes_debug(
-        depth_for_update, intrinsics,
-        depth_input.agent_x, depth_input.agent_y, depth_input.agent_heading,
-    )
 
     return DepthFrameResult(
         occupancy_rays=occupancy_rays,
-        landmark_plane_observations=[
-            info.landmark for info in landmark_debug.planes if info.landmark is not None
-        ],
         is_calibrated=is_calibrated,
         frame=depth_input.frame,
         raw_depth=raw_depth,
@@ -97,7 +83,6 @@ def process_depth_frame(
         intrinsics=intrinsics,
         validation=validation,
         validation_mask=validation_mask,
-        landmark_debug=landmark_debug,
         depth_rays=depth_rays,
     )
 

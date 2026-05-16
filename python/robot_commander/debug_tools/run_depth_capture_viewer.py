@@ -12,7 +12,6 @@ from robot_commander.depth_processing.cone_depth_processor import ConeDepthProce
 from robot_commander.depth_processing.cone_depth_rays import depth_to_rays, detect_floor, floor_plane_basis
 from robot_commander.depth_processing.depth_capture import load, rays_to_ends
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.depth_planes import extract_landmark_planes_debug
 from robot_commander.depth_processing.ransac import detect_planes
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
 from robot_commander.image_processing.intrinsics import Intrinsics
@@ -105,14 +104,8 @@ def _show(
     if no_plot:
         return
 
-    is_valid = validation.disqualification_reason is None
     display_depth = calibrated_depth if capture.is_calibrated else raw_depth
     calibration_tag = "calibrated" if capture.is_calibrated else "uncalibrated (raw metric)"
-
-    landmark_debug = extract_landmark_planes_debug(
-        calibrated_depth if is_valid else raw_depth,
-        capture.intrinsics, capture.agent_x, capture.agent_y, capture.heading,
-    )
 
     fig, axes = plt.subplots(1, 6, figsize=(33, 5))
     fig.suptitle(f"Depth capture — {capture_path.name}  [{calibration_tag}]")
@@ -122,7 +115,6 @@ def _show(
     _draw_top_down_rays(axes[2], capture.agent_x, capture.agent_y, capture.heading, ray_ends)
     _draw_plane_inliers(axes[3], display_depth, validation_mask, validation)
     _draw_all_planes(axes[4], raw_depth, capture.intrinsics)
-    _draw_landmark_plane_debug(axes[5], capture.agent_x, capture.agent_y, capture.heading, landmark_debug)
 
     plt.tight_layout()
 
@@ -229,48 +221,6 @@ def _draw_plane_inliers(ax, depth: np.ndarray, cone_mask: np.ndarray, validation
             fontsize=7,
             framealpha=0.7,
         )
-
-
-def _draw_landmark_plane_debug(ax, agent_x: float, agent_y: float, heading: float, debug_result) -> None:
-    ax.set_aspect("equal")
-    ax.set_title(
-        f"Landmark planes (world 2D)\nfloor alignment: {debug_result.floor_alignment:.2f}"
-        if debug_result.floor_alignment is not None else "Landmark planes — no floor detected",
-        fontsize=8,
-    )
-    ax.set_xlabel("x (m)")
-    ax.set_ylabel("y (m)")
-
-    ax.plot(agent_x, agent_y, "ko", markersize=8, zorder=10)
-    dx = _HEADING_ARROW_LENGTH_M * math.cos(heading)
-    dy = _HEADING_ARROW_LENGTH_M * math.sin(heading)
-    ax.annotate("", xy=(agent_x + dx, agent_y + dy), xytext=(agent_x, agent_y),
-                arrowprops={"arrowstyle": "->", "color": "black", "lw": 1.5})
-
-    scatter_colors = ["red", "lime", "cyan"]
-    for i, info in enumerate(debug_result.planes):
-        color = scatter_colors[i % len(scatter_colors)]
-        pts = info.world_2d_points
-        sample = pts[::max(1, len(pts) // 500)]  # downsample for speed
-        ax.scatter(sample[:, 0], sample[:, 1], s=2, color=color, alpha=0.4, rasterized=True)
-
-        if info.landmark is not None:
-            a, b = info.landmark.endpoint_a, info.landmark.endpoint_b
-            ax.plot([a[0], b[0]], [a[1], b[1]], color=color, linewidth=3,
-                    label=f"P{i} accepted")
-        else:
-            centroid = pts.mean(axis=0)
-            ax.annotate(
-                f"P{i}: {info.rejection_reason}",
-                xy=centroid,
-                fontsize=6,
-                color=color,
-                ha="center",
-                bbox={"boxstyle": "round,pad=0.2", "fc": "white", "alpha": 0.7},
-            )
-
-    ax.legend(fontsize=7, loc="lower left")
-    ax.grid(True, alpha=0.3)
 
 
 def _draw_all_planes(ax, raw_depth: np.ndarray, intrinsics: Intrinsics) -> None:
