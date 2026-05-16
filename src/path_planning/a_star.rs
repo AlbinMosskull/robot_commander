@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::cmp::Ordering;
 
 use pyo3::prelude::*;
 
@@ -7,6 +6,7 @@ use crate::occupancy_map::occupancy_map::OccupancyMap;
 use crate::occupancy_map::occupancy_map::Position2d;
 use crate::core::min_heap::MinHeap;
 use crate::core::geometry_types::WorldPosition2d;
+use super::common::{Position2dWithCost, reconstruct_path};
 
 
 #[pyfunction]
@@ -32,141 +32,61 @@ fn plan_path_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d
     (result.last() == Some(&goal)).then_some(result)
 }
 
-
 fn plan_path_towards_goal_indices(occ_map: &OccupancyMap, start: Position2d, goal: Position2d, collision_margin: f32) -> Vec<Position2d> {
     let mut came_from: HashMap<Position2d, Position2d> = HashMap::new();
     let mut best_g_scores: HashMap<Position2d, f32> = HashMap::new();
     let mut open_set: MinHeap<Position2dWithCost> = MinHeap::new();
 
-    let costed_start = Position2dWithCost {
+    open_set.insert(Position2dWithCost {
         position: start,
         g_cost: 0.0,
-        h_cost: heuristic_cost_to_go(start, goal),
-    };
-    open_set.insert(costed_start);
+        h_cost: manhattan_distance(start, goal),
+    });
     best_g_scores.insert(start, 0.0);
-    
+
     while open_set.len() > 0 {
         let costed_current = open_set.extract_min().expect("While loop checks for empty");
         let current = costed_current.position;
 
         if costed_current.g_cost > best_g_scores.get(&current).copied().expect("Should always have a value") {
-            continue;  // A better path to the node has already been added, so we do not need to explore this one.
+            continue;
         }
 
         if current == goal {
             return reconstruct_path(&came_from, current);
         }
 
-        let neighbors = get_neighbors(&occ_map, current, collision_margin);
-        let tentative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;  // 1.0 being cost per edge
-        for neighbor in neighbors {
+        let tentative_g_cost = best_g_scores.get(&current).expect("Should always have a value") + 1.0;
+        for neighbor in get_neighbors(occ_map, current, collision_margin) {
             if tentative_g_cost < best_g_scores.get(&neighbor).copied().unwrap_or(f32::INFINITY) {
-                came_from.insert(neighbor, current);  // insert will update if key is present.
-                let neighbor_with_cost = Position2dWithCost{
+                came_from.insert(neighbor, current);
+                best_g_scores.insert(neighbor, tentative_g_cost);
+                open_set.insert(Position2dWithCost {
                     position: neighbor,
                     g_cost: tentative_g_cost,
-                    h_cost: heuristic_cost_to_go(neighbor, goal)
-                };
-                
-                best_g_scores.insert(neighbor, tentative_g_cost);
-                open_set.insert(neighbor_with_cost);
+                    h_cost: manhattan_distance(neighbor, goal),
+                });
             }
         }
     }
 
-    // Could not reach the goal. Return the point closest to the goal
-    let closest_to_goal = *best_g_scores.keys().min_by(|a, b| {
-        heuristic_cost_to_go(**a, goal).partial_cmp(&heuristic_cost_to_go(**b, goal))
-        .unwrap()}).expect("The best_g_scores should never be empty, start is always added");
+    let closest_to_goal = *best_g_scores.keys()
+        .min_by(|a, b| manhattan_distance(**a, goal).partial_cmp(&manhattan_distance(**b, goal)).unwrap())
+        .expect("best_g_scores should never be empty");
     reconstruct_path(&came_from, closest_to_goal)
 }
 
-
-#[derive(Copy, Clone)] 
-struct Position2dWithCost {
-    position: Position2d,
-    g_cost: f32,
-    h_cost: f32,
-}
-
-
-impl Position2dWithCost {
-    fn get_total_cost(&self) -> f32 {
-        self.g_cost + self.h_cost
-    }
-}
-
-impl Ord for Position2dWithCost {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let diff = self.get_total_cost() - other.get_total_cost();
-        if diff < 0.0 {
-            return Ordering::Less;
-        } else if diff > 0.0 {
-            return Ordering::Greater;
-        } else {
-            return Ordering::Equal;
-        }
-    }
-}
-
-impl PartialOrd for Position2dWithCost {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Eq for Position2dWithCost {}
-
-impl PartialEq for Position2dWithCost {
-    fn eq(&self, other: &Self) -> bool {
-        self.get_total_cost() == other.get_total_cost()
-    }
-}
-
-fn reconstruct_path(came_from: &HashMap<Position2d, Position2d>, final_position: Position2d) -> Vec<Position2d> {
-    let mut full_path: Vec<Position2d> = Vec::new();
-
-    let mut current_position = final_position;
-    loop {
-        full_path.push(current_position);
-
-        let next = came_from.get(&current_position);
-
-        match next {
-            None => break,
-            Some(next) => current_position = *next,
-        }
-    }
-    full_path.reverse();
-    full_path
-}
-
 fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin: f32) -> Vec<Position2d> {
-    let mut neighbors = Vec::new();
-    const ALLOWED_DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
-    
-    for (dx, dy) in ALLOWED_DIRECTIONS {
-        let neighbor = Position2d{
-            x: position.x + dx,
-            y: position.y + dy,
-        };
-
-        if occ_map.is_valid_index(neighbor, collision_margin) {
-            neighbors.push(neighbor);
-        }           
-    }
-
-    neighbors
+    const DIRECTIONS: [(isize, isize); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
+    DIRECTIONS.iter()
+        .map(|(dx, dy)| Position2d { x: position.x + dx, y: position.y + dy })
+        .filter(|neighbor| occ_map.is_valid_index(*neighbor, collision_margin))
+        .collect()
 }
 
-
-fn heuristic_cost_to_go(current: Position2d, goal: Position2d) -> f32 {
-    ((goal.x - current.x).abs() + (goal.y - current.y).abs()) as f32
+fn manhattan_distance(a: Position2d, b: Position2d) -> f32 {
+    ((b.x - a.x).abs() + (b.y - a.y).abs()) as f32
 }
-
-
-
 
 
 #[cfg(test)]
@@ -196,7 +116,6 @@ mod tests {
     #[test]
     fn path_routes_around_obstacle() {
         let mut occ_map = make_map(5, 3);
-        // Wall at x=2 blocking rows y=0 and y=1, leaving y=2 as the only passage
         occ_map.update_cell(2, 0, true);
         occ_map.update_cell(2, 1, true);
         let path = plan_path_indices(&occ_map, Position2d { x: 0, y: 1 }, Position2d { x: 4, y: 1 }, 0.0).expect("Should route around obstacle");
@@ -206,7 +125,6 @@ mod tests {
     #[test]
     fn returns_none_when_goal_is_unreachable() {
         let mut occ_map = make_map(3, 3);
-        // Block all approaches to (2,2)
         occ_map.update_cell(1, 2, true);
         occ_map.update_cell(2, 1, true);
         let path = plan_path_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 2, y: 2 }, 0.0);
@@ -223,15 +141,12 @@ mod tests {
     #[test]
     fn towards_goal_ends_at_closest_reachable_node_when_goal_blocked() {
         let mut occ_map = make_map(3, 3);
-        // Block all approaches to (2,2)
         occ_map.update_cell(1, 2, true);
         occ_map.update_cell(2, 1, true);
         let path = plan_path_towards_goal_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 2, y: 2 }, 0.0);
-        // Best reachable node is (0,2) or (1,1) — both have Manhattan distance 2 from goal.
-        // Either way the path must not be empty and must not end at the blocked goal.
         assert!(!path.is_empty());
         assert_ne!(*path.last().unwrap(), Position2d { x: 2, y: 2 });
-        assert_eq!(heuristic_cost_to_go(*path.last().unwrap(), Position2d { x: 2, y: 2 }), 2.0);
+        assert_eq!(manhattan_distance(*path.last().unwrap(), Position2d { x: 2, y: 2 }), 2.0);
     }
 
     #[test]
@@ -245,7 +160,6 @@ mod tests {
     #[test]
     fn collision_margin_blocks_path_through_narrow_gap() {
         let mut occ_map = make_map(5, 3);
-        // One-cell gap at (2,1) between obstacles at (2,0) and (2,2)
         occ_map.update_cell(2, 0, true);
         occ_map.update_cell(2, 2, true);
         assert!(plan_path_indices(&occ_map, Position2d { x: 0, y: 1 }, Position2d { x: 4, y: 1 }, 0.0).is_some());

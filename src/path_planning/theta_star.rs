@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::cmp::Ordering;
 
 use line_drawing::bresenham;
 use pyo3::prelude::*;
@@ -8,6 +7,7 @@ use crate::occupancy_map::occupancy_map::OccupancyMap;
 use crate::occupancy_map::occupancy_map::Position2d;
 use crate::core::min_heap::MinHeap;
 use crate::core::geometry_types::WorldPosition2d;
+use super::common::{Position2dWithCost, reconstruct_path};
 
 
 #[pyfunction]
@@ -89,55 +89,6 @@ fn plan_towards_goal_theta_star_indices(occ_map: &OccupancyMap, start: Position2
     reconstruct_path(&came_from, closest_to_goal)
 }
 
-
-#[derive(Copy, Clone)]
-struct Position2dWithCost {
-    position: Position2d,
-    g_cost: f32,
-    h_cost: f32,
-}
-
-impl Position2dWithCost {
-    fn total_cost(&self) -> f32 {
-        self.g_cost + self.h_cost
-    }
-}
-
-impl Ord for Position2dWithCost {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let diff = self.total_cost() - other.total_cost();
-        if diff < 0.0 { Ordering::Less } else if diff > 0.0 { Ordering::Greater } else { Ordering::Equal }
-    }
-}
-
-impl PartialOrd for Position2dWithCost {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Eq for Position2dWithCost {}
-
-impl PartialEq for Position2dWithCost {
-    fn eq(&self, other: &Self) -> bool {
-        self.total_cost() == other.total_cost()
-    }
-}
-
-fn reconstruct_path(came_from: &HashMap<Position2d, Position2d>, final_position: Position2d) -> Vec<Position2d> {
-    let mut path: Vec<Position2d> = Vec::new();
-    let mut current = final_position;
-    loop {
-        path.push(current);
-        match came_from.get(&current) {
-            None => break,
-            Some(next) => current = *next,
-        }
-    }
-    path.reverse();
-    path
-}
-
 fn get_neighbors(occ_map: &OccupancyMap, position: Position2d, collision_margin: f32) -> Vec<Position2d> {
     const DIRECTIONS: [(isize, isize); 8] = [
         (1, 0), (-1, 0), (0, 1), (0, -1),
@@ -183,8 +134,6 @@ mod tests {
 
     #[test]
     fn produces_shorter_path_than_a_star_in_open_space() {
-        // In open space, Theta* connects start directly to goal via line-of-sight, giving a 2-node path.
-        // A* with 4-connectivity produces 5 nodes for the same (0,0) -> (2,2) query.
         let occ_map = make_map(5, 5);
         let path = plan_theta_star_indices(&occ_map, Position2d { x: 0, y: 0 }, Position2d { x: 4, y: 4 }, 0.0).expect("Should find a path");
         assert_eq!(path.len(), 2);
@@ -228,7 +177,6 @@ mod tests {
     #[test]
     fn towards_goal_ends_at_closest_reachable_node_when_goal_blocked() {
         let mut occ_map = make_map(3, 3);
-        // Block the goal and all its 8-connected neighbors so it is truly unreachable
         occ_map.update_cell(1, 1, true);
         occ_map.update_cell(1, 2, true);
         occ_map.update_cell(2, 1, true);
