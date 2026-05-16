@@ -47,6 +47,7 @@ class LocalizationConfig:
 @dataclass(frozen=True)
 class DepthConfig:
     cone_half_angle_deg: float
+    camera_up: tuple[float, float, float]
 
 
 @dataclass(frozen=True)
@@ -93,5 +94,6 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         ),
         depth=DepthConfig(
             cone_half_angle_deg=raw["depth"]["cone_half_angle_deg"],
+            camera_up=tuple(raw["depth"]["camera_up"]),
         ),
     )

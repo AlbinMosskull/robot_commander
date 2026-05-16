@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor
-from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
+from robot_commander.depth_processing.depth_rays import depth_to_rays
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.sensor.range_reading import RangeReading

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from robot_commander.image_processing.intrinsics import Intrinsics
-from robot_commander.depth_processing.cone_depth_rays import depth_to_rays
+from robot_commander.depth_processing.depth_rays import depth_to_rays
 
 _FX = 500.0
 _FY = 500.0

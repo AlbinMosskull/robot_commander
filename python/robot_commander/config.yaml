@@ -29,3 +29,4 @@ localization:
 
 depth:
   cone_half_angle_deg: 15.0
+  camera_up: [0.0, -1.0, 0.0]

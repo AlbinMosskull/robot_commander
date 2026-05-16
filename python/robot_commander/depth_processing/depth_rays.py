@@ -2,28 +2,16 @@ import math
 
 import numpy as np
 
+from robot_commander.config import load as load_config
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.ransac import detect_planes, Plane
+from robot_commander.depth_processing.ransac import detect_floor
 from robot_commander.image_processing.intrinsics import Intrinsics
 from robot_commander.sensor.range_reading import RangeReading
 
+_CAMERA_UP = np.array(load_config().depth.camera_up)
 _MIN_OBSTACLE_HEIGHT_M = 0.05
-_RANSAC_ITERATIONS = 100
-_RANSAC_DISTANCE_THRESHOLD_M = 0.03
-_N_PLANES = 3
-_CAMERA_UP = np.array([0.0, -1.0, 0.0])
 _MIN_FLOOR_ALIGNMENT = 0.7
 _BOTTOM_ROW_SKIP_FRACTION = 0.1
-
-
-def detect_floor(points: np.ndarray) -> Plane | None:
-    planes = detect_planes(points, n_planes=_N_PLANES, n_iterations=_RANSAC_ITERATIONS, distance_threshold=_RANSAC_DISTANCE_THRESHOLD_M)
-    if not planes:
-        return None
-    floor = max(planes, key=lambda p: abs(float(p.normal @ _CAMERA_UP)))
-    if floor.distance > 0:
-        floor = Plane(-floor.normal, -floor.distance, floor.inliers)
-    return floor
 
 
 def floor_plane_basis(floor_normal: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

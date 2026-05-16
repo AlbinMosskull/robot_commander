@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from robot_commander.depth_processing.cone_depth_rays import detect_floor
+from robot_commander.depth_processing.ransac import detect_floor
 from robot_commander.depth_processing.depth_processor import DepthProcessor
 from robot_commander.depth_processing.ultrasonic_plane_validator import (
     PlaneValidationResult,

@@ -9,10 +9,10 @@ import numpy as np
 from robot_commander.config import load as load_config
 from robot_commander.agent.adeept.adeept_transforms import CAMERA_T_SENSOR_CENTER
 from robot_commander.depth_processing.cone_depth_processor import ConeDepthProcessor, ConeGeometry
-from robot_commander.depth_processing.cone_depth_rays import depth_to_rays, detect_floor, floor_plane_basis
+from robot_commander.depth_processing.depth_rays import depth_to_rays, floor_plane_basis
 from robot_commander.depth_processing.depth_capture import load, rays_to_ends
 from robot_commander.depth_processing.point_cloud import depth_image_to_point_cloud
-from robot_commander.depth_processing.ransac import detect_planes
+from robot_commander.depth_processing.ransac import detect_floor, detect_planes
 from robot_commander.depth_processing.ultrasonic_plane_validator import PlaneValidationResult
 from robot_commander.image_processing.intrinsics import Intrinsics
 
@@ -50,7 +50,7 @@ def _print_validation(validation: PlaneValidationResult) -> None:
 
 
 def _print_ray_pipeline_diagnostics(calibrated_depth: np.ndarray, intrinsics) -> None:
-    from robot_commander.depth_processing.cone_depth_rays import _MIN_OBSTACLE_HEIGHT_M
+    from robot_commander.depth_processing.depth_rays import _MIN_OBSTACLE_HEIGHT_M
     print("\n--- Ray pipeline diagnostics ---")
     camera_points = depth_image_to_point_cloud(calibrated_depth, intrinsics)
     print(f"  point cloud size: {len(camera_points)}")

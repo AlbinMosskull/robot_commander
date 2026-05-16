@@ -2,6 +2,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from robot_commander.config import load as load_config
+
+_CAMERA_UP = np.array(load_config().depth.camera_up)
+
 
 @dataclass(frozen=True)
 class Plane:
@@ -147,3 +151,18 @@ def detect_planes(
         remaining_idx = remaining_idx[~plane.inliers]
 
     return planes
+
+
+def detect_floor(
+    points: np.ndarray,
+    n_planes: int = 3,
+    n_iterations: int = 100,
+    distance_threshold: float = 0.03,
+) -> Plane | None:
+    planes = detect_planes(points, n_planes=n_planes, n_iterations=n_iterations, distance_threshold=distance_threshold)
+    if not planes:
+        return None
+    floor = max(planes, key=lambda p: abs(float(p.normal @ _CAMERA_UP)))
+    if floor.distance > 0:
+        floor = Plane(-floor.normal, -floor.distance, floor.inliers)
+    return floor
