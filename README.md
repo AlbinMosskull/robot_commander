@@ -7,7 +7,7 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
 - **Remote Control provides an escape plan for completing the mission:** Obstacle mapping and path planning (built in rust) are run on remote control, but the agent holds an "escape plan", a way to return towards a safe position if it loses connection to the remote control station
 - **Simple ultrasonic gives richer information thanks to DepthAnything:** DepthAnything combined with an ultrasonic sensor gives richer information at each reading from the sensor, for building the obstacle map
 
-![Demo](media/robot_spider_demo_edited.mp4)
+![Demo](media/full_run.mp4)
 
 ## Hardware setup
 The project currently supports the Adeept Raspclaws Ultimate spider, and it is also possible to run fully in simulation.
