@@ -154,3 +154,6 @@ class SimulatedAgent(AbstractAgent):
 
     def GetPayload(self) -> bytes | None:
         return None
+    
+    def close(self) -> None:
+        pass

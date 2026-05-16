@@ -35,7 +35,8 @@ class DashboardWindow(QMainWindow):
         )
 
         self._client = _try_connect_client(agent_host)
-        camera_overhead = WebCamera()
+        simulated = agent_host is not None
+        camera_overhead = FromFileCamera(_EXAMPLE_INPUT / "scene_image.jpg") if simulated else WebCamera()
         self._controller = build_controller(self._client, camera_overhead)
 
         camera_pov = AgentCamera(self._controller) if self._client is not None else FromFileCamera(_EXAMPLE_INPUT / "robot_pov.jpg")

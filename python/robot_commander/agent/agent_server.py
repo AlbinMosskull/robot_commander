@@ -3,10 +3,10 @@ from concurrent import futures
 
 import cv2
 import grpc
+import argparse
 
 from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.agent.simulated.simulated_agent import SimulatedAgent
-from robot_commander.agent.adeept.adeept_agent import AdeeptAgent
 from robot_commander.proto import agent_pb2, agent_pb2_grpc
 from robot_commander import config as cfg
 
@@ -98,14 +98,19 @@ class AgentControlServicer(agent_pb2_grpc.AgentControlServicer):
 
 
 def main():
-    import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--no-escape-plan", action="store_true", help="Disable escape plan")
-    parser.add_argument("--raw-sensor", action="store_true", help="Sweep ultrasonic sensor and stream rays")
+    parser.add_argument("--simulate", action="store_true", help="Run simulated agent instead of real hardware")
+    parser.add_argument("--no-escape-plan", action="store_true", help="Disable escape plan (real agent only)")
+    parser.add_argument("--raw-sensor", action="store_true", help="Sweep ultrasonic sensor and stream rays (real agent only)")
     args = parser.parse_args()
 
     port = cfg.load().connection.port
-    agent = AdeeptAgent(escape_plan_enabled=not args.no_escape_plan, raw_sensor=args.raw_sensor)
+    if args.simulate:
+        agent: AbstractAgent = SimulatedAgent()
+    else:
+        # Since the import breaks unless the user is on raspberry pi hardware, we delay it until we know it's needed.
+        from robot_commander.agent.adeept.adeept_agent import AdeeptAgent
+        agent = AdeeptAgent(escape_plan_enabled=not args.no_escape_plan, raw_sensor=args.raw_sensor)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     agent_pb2_grpc.add_AgentControlServicer_to_server(AgentControlServicer(agent), server)
     server.add_insecure_port(f"[::]:{port}")
