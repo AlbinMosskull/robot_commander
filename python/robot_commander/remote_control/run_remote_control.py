@@ -12,6 +12,7 @@ os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH", None)
 
 from PyQt6.QtWidgets import QApplication
 
+from robot_commander import config as cfg
 from robot_commander.dashboard.slideshow_window import SlideshowWindow
 from robot_commander.dashboard.window import DashboardWindow
 
@@ -19,9 +20,19 @@ _MAP_BUILD_PROGRESS_DIR = Path("plots/debug")
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--use-sim-agent", action="store_true")
+    return parser.parse_args()
+
+
 def main():
+    args = _parse_args()
+    connection = cfg.load().connection
+    agent_host = connection.simulated_host if args.use_sim_agent else None
+
     app = QApplication(sys.argv)
-    dashboard = DashboardWindow(show_escape_plan=True)
+    dashboard = DashboardWindow(show_escape_plan=True, agent_host=agent_host)
 
     map_build_images = (
         sorted(

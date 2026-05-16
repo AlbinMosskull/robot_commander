@@ -21,6 +21,7 @@ agent:
 
 connection:
   host: 192.168.0.43
+  simulated_host: localhost
   port: 50051
 
 map:

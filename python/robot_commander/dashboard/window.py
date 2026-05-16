@@ -18,15 +18,15 @@ from robot_commander.remote_control.controller import build_controller
 _EXAMPLE_INPUT = Path("images/example_input")
 
 
-def _try_connect_client() -> AgentClient | None:
+def _try_connect_client(host: str | None = None) -> AgentClient | None:
     try:
-        return AgentClient()
+        return AgentClient(host=host) if host is not None else AgentClient()
     except Exception:
         return None
 
 
 class DashboardWindow(QMainWindow):
-    def __init__(self, show_escape_plan: bool = False):
+    def __init__(self, show_escape_plan: bool = False, agent_host: str | None = None):
         super().__init__()
         self.setWindowTitle("Robot Commander")
         self.resize(1280, 720)
@@ -34,7 +34,7 @@ class DashboardWindow(QMainWindow):
             "background-color: #1a1a1a; color: #e0e0e0; font-family: monospace;"
         )
 
-        self._client = _try_connect_client()
+        self._client = _try_connect_client(agent_host)
         camera_overhead = WebCamera()
         self._controller = build_controller(self._client, camera_overhead)
 

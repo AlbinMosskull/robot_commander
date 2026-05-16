@@ -37,6 +37,7 @@ class AgentConfig:
 @dataclass(frozen=True)
 class ConnectionConfig:
     host: str
+    simulated_host: str
     port: int
 
 
@@ -89,6 +90,7 @@ def load(path: Path = _CONFIG_PATH) -> Config:
         ),
         connection=ConnectionConfig(
             host=raw["connection"]["host"],
+            simulated_host=raw["connection"]["simulated_host"],
             port=raw["connection"]["port"],
         ),
         map=MapConfig(
