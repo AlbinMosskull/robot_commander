@@ -28,6 +28,8 @@ remote-station = [
 agent-server = "robot_commander.agent.agent_server:main"
 remote-control = "robot_commander.remote_control.run_remote_control:main"
 calibrate-camera = "robot_commander.image_processing.run_calibration:main"
+agent-monitor = "robot_commander.claude_controller.run_agent_monitor:main"
+agent-cmd = "robot_commander.claude_controller.run_agent_command:main"
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
