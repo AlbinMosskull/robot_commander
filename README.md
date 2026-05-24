@@ -137,6 +137,15 @@ add a
 ```
 flag to both of the scripts to run in simulation.
 
+### Controls
+
+| Control | Action |
+|---------|--------|
+| Left click on map | Set waypoint, no path planning |
+| Shift + left drag on map | Set waypoint with heading, path planning |
+| `S` | Scout, rotate in place to observe more |
+| `P` | Enable payload, capture an image at the end of the current plan, store to payload |
+
 
 ## Conventions
 - Transforms should be named like camera_T_sensor and be 4x4
