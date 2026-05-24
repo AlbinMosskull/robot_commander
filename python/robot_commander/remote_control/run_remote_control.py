@@ -22,14 +22,14 @@ _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--use-sim-agent", action="store_true")
+    parser.add_argument("--simulate", action="store_true")
     return parser.parse_args()
 
 
 def main():
     args = _parse_args()
     connection = cfg.load().connection
-    agent_host = connection.simulated_host if args.use_sim_agent else None
+    agent_host = connection.simulated_host if args.simulate else None
 
     app = QApplication(sys.argv)
     dashboard = DashboardWindow(show_escape_plan=True, agent_host=agent_host)

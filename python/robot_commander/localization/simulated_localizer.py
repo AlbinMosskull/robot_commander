@@ -20,8 +20,6 @@ class SimulatedLocalizer(WorldLocalizer):
         if pos is None:
             return None
         x, y, heading = pos
-        noisy_x, noisy_y = np.random.normal([x, y], scale=0.02)
-        self._client.observe_position(float(noisy_x), float(noisy_y), heading, confidence=1.0)
         return WorldPose(x, y, heading)
 
     def _stream(self) -> None:

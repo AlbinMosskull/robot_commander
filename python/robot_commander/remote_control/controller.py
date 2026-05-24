@@ -20,15 +20,19 @@ from robot_commander.image_processing.intrinsics import AGENT_CAMERA_PATH, Intri
 from robot_commander.image_processing.tag_detector import TagDetector
 from robot_commander.localization.camera_localizer import CameraLocalizer
 from robot_commander.localization.localizer import Localizer
+from robot_commander.localization.simulated_localizer import SimulatedLocalizer
 from robot_commander.localization.world_localizer import WorldLocalizer, WorldPose
 from robot_commander.map.map_coordinates import MapCoordinates
 from robot_commander.remote_control.agent_client import AgentClient
 from robot_commander.remote_control.navigation import Navigator
 from robot_commander.remote_control.obstacle_mapping import ObstacleMapper
 
-def build_controller(client: AgentClient | None, overhead_camera: Camera) -> "RemoteControl":
+def build_controller(client: AgentClient | None, overhead_camera: Camera, simulated: bool = False) -> "RemoteControl":
     if client is None:
         return RemoteControl(None, None, overhead_camera=overhead_camera)
+
+    if simulated:
+        return RemoteControl(client, SimulatedLocalizer(client), overhead_camera=overhead_camera)
 
     cfg = load_config()
     overhead_intrinsics = calibration.load()
