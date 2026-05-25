@@ -63,7 +63,7 @@ If no such plane is found, the ultrasonic reading is discarded. Instead, we cons
       <br><br>
       <video src="https://github.com/user-attachments/assets/afbfe9c5-1d5e-4b0c-87ae-2a8c09a7bb19" autoplay loop muted playsinline width="100%" alt="Plane matching visualization"></video>
       <br><br>
-      <i>When we find a plane in the point cloud in the sensor region, we calibrate the depth image and obstacles for what we found</i>
+      <i>When we find a plane in the point cloud in the sensor region, we calibrate the depth image and add obstacles for what we found</i>
     </td>
     <td width="50%" align="center">
       <b>Free Space</b>
