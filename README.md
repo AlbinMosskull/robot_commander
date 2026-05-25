@@ -69,7 +69,7 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
 ## Hardware setup
 The project currently supports the Adeept Raspclaws Ultimate spider, and it is also possible to run fully in simulation.
 
-For a proper hardware setup, you need to assemble the spider, and ensure you have remote access to your raspberry pi. You should also mount a webcamera such that is oversees the scene in which you want to control the robot spider, such as by mounting it to a chair. You need to add an april tag to your spider, mounted on top of the camera.
+For a proper hardware setup, you need to assemble the spider, and ensure you have remote access to your raspberry pi. You should also mount a webcamera such that it oversees the scene in which you want to control the robot spider, such as by mounting it to a chair. You need to add an april tag to your spider, mounted on top of the camera.
 
 ## Installation
 
