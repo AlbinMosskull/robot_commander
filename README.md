@@ -8,7 +8,7 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
 - **Simple ultrasonic gives richer information thanks to DepthAnything:** DepthAnything combined with an ultrasonic sensor gives richer information at each reading from the sensor, for building the obstacle map
 
 <p align="center">
-  <video src="media/full_run.mp4" controls width="100%" alt="Full system demo"></video>
+  <video src="https://github.com/user-attachments/assets/d94040a4-44ed-4174-9208-efb14564130f" controls width="100%" alt="Full system demo"></video>
 </p>
 
 ## Algorithms
@@ -20,12 +20,12 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
     <td width="50%" align="center">
       <b>Map Building</b>
       <br><br>
-      <video src="media/build_map.mp4" autoplay loop muted playsinline width="100%" alt="Map building animation"></video>
+      <video src="https://github.com/user-attachments/assets/5ffca650-2099-4952-a35c-acb583102747" autoplay loop muted playsinline width="100%" alt="Map building animation"></video>
     </td>
     <td width="50%" align="center">
       <b>Overhead Map</b>
       <br><br>
-      <img src="media/stencil_map.png" width="100%" alt="Static stencil map">
+      <img src="https://github.com/user-attachments/assets/985e76d3-6a78-4ebf-9b68-5ec14145c633" width="100%" alt="Static stencil map">
     </td>
   </tr>
 </table>
@@ -37,12 +37,12 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
     <td width="50%" align="center">
       <b>Plane Matching</b>
       <br><br>
-      <video src="media/plane_matching_1.mp4" autoplay loop muted playsinline width="100%" alt="Plane matching visualization"></video>
+      <video src="https://github.com/user-attachments/assets/afbfe9c5-1d5e-4b0c-87ae-2a8c09a7bb19" autoplay loop muted playsinline width="100%" alt="Plane matching visualization"></video>
     </td>
     <td width="50%" align="center">
       <b>Free Space</b>
       <br><br>
-      <video src="media/plane_matching_2.mp4" autoplay loop muted playsinline width="100%" alt="Free space detection visualization"></video>
+      <video src="https://github.com/user-attachments/assets/f90d33de-6c7e-4cf1-aeba-0647bf0510ee" autoplay loop muted playsinline width="100%" alt="Free space detection visualization"></video>
     </td>
   </tr>
 </table>
@@ -54,12 +54,12 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
     <td width="50%" align="center">
       <b>Scenario 1</b>
       <br><br>
-      <video src="media/planning_scenario_1.mp4" autoplay loop muted playsinline width="100%" alt="Path planning scenario one"></video>
+      <video src="https://github.com/user-attachments/assets/966b8fab-4e0c-4f58-bf90-c0d6d3189df0" autoplay loop muted playsinline width="100%" alt="Path planning scenario one"></video>
     </td>
     <td width="50%" align="center">
       <b>Scenario 2</b>
       <br><br>
-      <video src="media/planning_scenario_2.mp4" autoplay loop muted playsinline width="100%" alt="Path planning scenario two"></video>
+      <video src="https://github.com/user-attachments/assets/78e7725c-2e7d-4c52-b769-d6d4137cde6d" autoplay loop muted playsinline width="100%" alt="Path planning scenario two"></video>
     </td>
   </tr>
 </table>
