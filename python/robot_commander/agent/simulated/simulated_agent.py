@@ -8,6 +8,7 @@ from robot_commander.agent.abstract_agent import AbstractAgent
 from robot_commander.sensor.range_reading import RangeReading
 from robot_commander.agent.simulated.motion_model import (
     V_MAX_M_S,
+    OMEGA_MAX_RAD_S,
     WAYPOINT_THRESHOLD_M,
     HEADING_ALIGNMENT_RAD,
     advance_heading,
@@ -20,9 +21,10 @@ from robot_commander.filtering.kalman_filter import KalmanFilter
 _TICK_HZ = 10
 _DT = 1.0 / _TICK_HZ
 _REMOTE_TIMEOUT_S = 5.0
-
-# Simulated GPS noise standard deviation (meters)
 _GPS_NOISE_STD = 0.05
+_SCOUT_OFFSETS_RAD = [math.radians(d) for d in (-30, 30)]
+_SCOUT_DWELL_S = 2.0
+_SCOUT_HEADING_THRESHOLD_RAD = math.radians(5)
 
 
 def _make_position_filter(start_x: float, start_y: float) -> KalmanFilter:
@@ -55,6 +57,9 @@ class SimulatedAgent(AbstractAgent):
         self._last_remote_message_time: float = time.time()
         self._escape_plan: list[tuple[float, float]] = []
         self._escape_plan_idx: int = 0
+        self._manual_override: bool = False
+        self._scout_target_heading: float | None = None
+        self._active_scout_cancel: threading.Event | None = None
 
         self._tick_thread = threading.Thread(target=self._tick_loop, daemon=True)
         self._tick_thread.start()
@@ -94,7 +99,13 @@ class SimulatedAgent(AbstractAgent):
     def _tick_loop(self):
         while True:
             with self._lock:
-                if time.time() - self._last_remote_message_time > _REMOTE_TIMEOUT_S and self._escape_plan:
+                if self._manual_override:
+                    if self._scout_target_heading is not None:
+                        error = normalize_angle(self._scout_target_heading - self.heading)
+                        max_turn = OMEGA_MAX_RAD_S * _DT
+                        self.heading += max(-max_turn, min(max_turn, error))
+                    self._speed = 0.0
+                elif time.time() - self._last_remote_message_time > _REMOTE_TIMEOUT_S and self._escape_plan:
                     self._escape_plan, self._escape_plan_idx = self._follow_waypoints(self._escape_plan, self._escape_plan_idx)
                 else:
                     self._waypoints, self._waypoint_idx = self._follow_waypoints(self._waypoints, self._waypoint_idx)
@@ -110,8 +121,20 @@ class SimulatedAgent(AbstractAgent):
 
             time.sleep(_DT)
 
+    def _rotate_to_heading(self, target_heading: float, cancel: threading.Event) -> None:
+        with self._lock:
+            self._scout_target_heading = target_heading
+        while not cancel.is_set():
+            with self._lock:
+                error = abs(normalize_angle(self.heading - target_heading))
+            if error < _SCOUT_HEADING_THRESHOLD_RAD:
+                break
+            time.sleep(_DT)
+
     def SetWaypointList(self, waypoints: list[tuple[float, float]], final_heading: float | None = None) -> None:
         with self._lock:
+            if self._active_scout_cancel is not None:
+                self._active_scout_cancel.set()
             self._waypoints = list(waypoints)
             self._waypoint_idx = 0
         self._notify_remote_message()
@@ -147,7 +170,31 @@ class SimulatedAgent(AbstractAgent):
         time.sleep(duration_s)
 
     def Scout(self) -> None:
-        pass
+        cancel = threading.Event()
+        with self._lock:
+            if self._active_scout_cancel is not None:
+                self._active_scout_cancel.set()
+            self._active_scout_cancel = cancel
+            self._manual_override = True
+            original_heading = self.heading
+
+        def _run() -> None:
+            try:
+                for offset_rad in _SCOUT_OFFSETS_RAD:
+                    if cancel.is_set():
+                        return
+                    self._rotate_to_heading(normalize_angle(original_heading + offset_rad), cancel)
+                    if cancel.wait(_SCOUT_DWELL_S):
+                        return
+                self._rotate_to_heading(original_heading, cancel)
+            finally:
+                with self._lock:
+                    if self._active_scout_cancel is cancel:
+                        self._active_scout_cancel = None
+                        self._manual_override = False
+                        self._scout_target_heading = None
+
+        threading.Thread(target=_run, daemon=True).start()
 
     def EnablePayload(self) -> None:
         pass

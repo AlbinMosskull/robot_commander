@@ -6,7 +6,7 @@ from robot_commander.agent.simulated.ray_caster import cast_ray, _RAY_RANGE, _SW
 
 _TICK_HZ = 10
 
-_CONE_HALF_ANGLE_DEG = 15.0
+_CONE_HALF_ANGLE_DEG = 10.0
 _CONE_RAYS = 9
 
 
