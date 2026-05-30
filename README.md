@@ -7,6 +7,7 @@ robot_commander is a project in which a robot spider (the agent) is commanded ar
 - **Remote Control provides an escape plan for completing the mission:** Obstacle mapping and path planning (built in rust) are run on remote control, but the agent holds an "escape plan", a way to return towards a safe position if it loses connection to the remote control station
 - **Simple ultrasonic gives richer information thanks to DepthAnything:** DepthAnything combined with an ultrasonic sensor gives richer information at each reading from the sensor, for building the obstacle map
 
+In this video, the operator in remote control is attempting to find a missing Yak, by sending commands to the agent to explore interesting regions.
 <p align="center">
   <video src="https://github.com/user-attachments/assets/d94040a4-44ed-4174-9208-efb14564130f" controls width="100%" alt="Full system demo"></video>
 </p>
